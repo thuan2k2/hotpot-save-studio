@@ -18,19 +18,28 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                switch selectedTab {
-                case .files: fileView
-                case .editor: editMenu
-                case .guide: guideView
+        // Keep the tab bar out of the scroll-view layout.  safeAreaInset made
+        // its position depend on the currently visible navigation container on
+        // iOS 26, which left unused black space beneath it on some devices.
+        ZStack(alignment: .bottom) {
+            NavigationStack {
+                Group {
+                    switch selectedTab {
+                    case .files: fileView
+                    case .editor: editMenu
+                    case .guide: guideView
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: 430)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            StudioTabBar(selection: $selectedTab)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
         }
+        .background(Color.black.ignoresSafeArea())
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .modifier(KeyboardDoneModifier())
-        .safeAreaInset(edge: .bottom, spacing: 0) { StudioTabBar(selection: $selectedTab) }
         .preferredColorScheme(.dark)
         .tint(.orange)
         // Keep the layout compact even when the phone has an enlarged accessibility text setting.
@@ -45,7 +54,7 @@ struct ContentView: View {
 
     private var fileView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 22) {
                 StudioPageHeader("Tệp", askToClear: $askToClearNow)
                 StudioSectionTitle("Dữ liệu save")
                 StudioCard {
@@ -60,24 +69,24 @@ struct ContentView: View {
                     StudioRow(icon: editor.hasWorkspace ? "checkmark.circle.fill" : "circle", title: "Dữ liệu giải mã", detail: editor.hasWorkspace ? "Đang được lưu trong ứng dụng" : "Chưa có dữ liệu giải mã", tint: editor.hasWorkspace ? .green : .secondary, showsChevron: false)
                 }
                 Text("Ứng dụng chỉ xử lý file bạn tự chọn trong Files. File gốc không bị ghi đè.").font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 4)
-            }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 112)
+            }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 96)
         }.background(Color.black).toolbar(.hidden, for: .navigationBar)
     }
 
     private var editMenu: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 22) {
                 StudioPageHeader("Chỉnh sửa", askToClear: $askToClearNow)
                 if !editor.isLoaded { StudioNotice("Hãy chọn file PLIST ở tab Tệp trước khi chỉnh sửa.") }
                 StudioSectionTitle("Công cụ chính")
                 StudioCard { StudioLinks([("banknote", "Chỉnh nhanh & mở khóa", "Tiền tệ, cấp độ và mở khóa nhanh", AnyView(QuickEditView())), ("crown", "VIP, gói nạp & sự kiện", "Thẻ tháng, quảng cáo và thẻ mùa giải", AnyView(AdvancedView())), ("square.and.pencil", "Chỉnh sửa từng mục", "Cơ sở, món ăn, khách hàng và túi đồ", AnyView(ManualEditorView())), ("arrow.counterclockwise", "Lượt mua & giới hạn", "Quét và đặt lại lượt, giới hạn, thời gian", AnyView(LimitEditorView()))]) }
                 StudioSectionTitle("Nội dung game")
                 StudioCard { StudioLinks([("puzzlepiece", "Bàn cờ ghép đồ", "Bóng nguyên tố và kho ghép đồ", AnyView(FusionView())), ("checklist", "Nhiệm vụ", "Nhiệm vụ thường, ngày, hoạt động và chương", AnyView(TasksView())), ("cat", "Mèo Thần Tài", "Phần thưởng và lịch sử tương tác", AnyView(LuckyCatView())), ("gamecontroller", "Sự kiện & trò chơi nhỏ", "Điểm và tiền tệ sự kiện", AnyView(MinigameView())), ("storefront", "Cửa hàng & VIP", "Thẻ tháng và tiền tệ cửa hàng", AnyView(ShopVIPView())), ("ticket", "Thẻ mùa giải", "Xu đào lỗ, cấp độ và thử thách", AnyView(GatePassView())), ("gift", "Quà sự kiện", "Đánh dấu nhận các phần thưởng hiện có", AnyView(EventRewardsView()))]) }
-            }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 112)
+            }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 96)
         }.background(Color.black).toolbar(.hidden, for: .navigationBar)
     }
     private var guideView: some View {
-        ScrollView { VStack(alignment: .leading, spacing: 26) { StudioPageHeader("Hướng dẫn", askToClear: $askToClearNow); StudioSectionTitle("Hướng dẫn sử dụng"); StudioCard { StudioRow(icon: "1.circle", title: "Chọn file save", detail: "Chọn com.lxqd.hotpotiver.plist trong Files", tint: .orange, showsChevron: false); Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 60); StudioRow(icon: "2.circle", title: "Chỉnh sửa dữ liệu", detail: "Mở các nhóm công cụ tại tab Chỉnh sửa", tint: .orange, showsChevron: false); Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 60); StudioRow(icon: "3.circle", title: "Xuất file mới", detail: "Đóng gói thành hotpot_repacked.bplist", tint: .orange, showsChevron: false) }; StudioSectionTitle("An toàn"); StudioNotice("Ứng dụng chỉ thao tác với file bạn tự chọn và không truy cập dữ liệu riêng của game.") }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 112) }.background(Color.black).toolbar(.hidden, for: .navigationBar)
+        ScrollView { VStack(alignment: .leading, spacing: 22) { StudioPageHeader("Hướng dẫn", askToClear: $askToClearNow); StudioSectionTitle("Hướng dẫn sử dụng"); StudioCard { StudioRow(icon: "1.circle", title: "Chọn file save", detail: "Chọn com.lxqd.hotpotiver.plist trong Files", tint: .orange, showsChevron: false); Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 52); StudioRow(icon: "2.circle", title: "Chỉnh sửa dữ liệu", detail: "Mở các nhóm công cụ tại tab Chỉnh sửa", tint: .orange, showsChevron: false); Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 52); StudioRow(icon: "3.circle", title: "Xuất file mới", detail: "Đóng gói thành hotpot_repacked.bplist", tint: .orange, showsChevron: false) }; StudioSectionTitle("An toàn"); StudioNotice("Ứng dụng chỉ thao tác với file bạn tự chọn và không truy cập dữ liệu riêng của game.") }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 96) }.background(Color.black).toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -172,7 +181,7 @@ private struct KeyboardDoneModifier: ViewModifier {
 private struct StudioSectionTitle: View {
     let title: String
     init(_ title: String) { self.title = title }
-    var body: some View { Text(title).font(.title3.weight(.bold)).foregroundStyle(.white).padding(.horizontal, 4) }
+    var body: some View { Text(title).font(.headline.weight(.bold)).foregroundStyle(.white).padding(.horizontal, 2) }
 }
 
 /// A compact in-content header for the three root tabs.  Keeping this inside
@@ -190,7 +199,7 @@ private struct StudioPageHeader: View {
     var body: some View {
         HStack(spacing: 10) {
             Text(title)
-                .font(.title2.weight(.bold))
+                .font(.title3.weight(.bold))
                 .foregroundStyle(.white)
 
             Spacer(minLength: 12)
@@ -199,8 +208,8 @@ private struct StudioPageHeader: View {
                 SettingsView()
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 40, height: 40)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 34, height: 34)
                     .background(Color.white.opacity(0.10), in: Circle())
             }
             .buttonStyle(.plain)
@@ -211,29 +220,29 @@ private struct StudioPageHeader: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 18, weight: .bold))
-                    .frame(width: 40, height: 40)
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(width: 34, height: 34)
                     .background(Color.white.opacity(0.10), in: Circle())
             }
         }
-        .padding(.top, 8)
+        .padding(.top, 4)
     }
 }
 
 private struct StudioCard<Content: View>: View {
     @ViewBuilder var content: Content
-    var body: some View { VStack(spacing: 0) { content }.background(Color.white.opacity(0.12), in: .rect(cornerRadius: 26)).overlay { RoundedRectangle(cornerRadius: 26).stroke(Color.white.opacity(0.06), lineWidth: 1) } }
+    var body: some View { VStack(spacing: 0) { content }.background(Color.white.opacity(0.12), in: .rect(cornerRadius: 20)).overlay { RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.06), lineWidth: 1) } }
 }
 
 private struct StudioRow: View {
     let icon: String; let title: String; let detail: String; var tint: Color = .orange; var showsChevron = true
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: icon).font(.system(size: 20, weight: .medium)).foregroundStyle(tint).frame(width: 42, height: 42).background(tint.opacity(0.16), in: .rect(cornerRadius: 12))
-            VStack(alignment: .leading, spacing: 3) { Text(title).font(.body.weight(.semibold)).foregroundStyle(.white).lineLimit(1); Text(detail).font(.subheadline).foregroundStyle(.secondary).lineLimit(2) }
-            Spacer(minLength: 8)
-            if showsChevron { Image(systemName: "chevron.right").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary) }
-        }.padding(.horizontal, 16).padding(.vertical, 13).contentShape(.rect)
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.system(size: 17, weight: .medium)).foregroundStyle(tint).frame(width: 36, height: 36).background(tint.opacity(0.16), in: .rect(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 2) { Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.white).lineLimit(1); Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+            Spacer(minLength: 6)
+            if showsChevron { Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary) }
+        }.padding(.horizontal, 13).padding(.vertical, 10).contentShape(.rect)
     }
 }
 
@@ -244,7 +253,7 @@ private struct StudioLinks: View {
         VStack(spacing: 0) {
             ForEach(entries.indices, id: \.self) { index in
                 NavigationLink { entries[index].3 } label: { StudioRow(icon: entries[index].0, title: entries[index].1, detail: entries[index].2) }.buttonStyle(.plain)
-                if index < entries.count - 1 { Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 72) }
+                if index < entries.count - 1 { Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 61) }
             }
         }
     }
@@ -263,11 +272,11 @@ private struct StudioTabBar: View {
             StudioTabButton(tab: .files, title: "Tệp", icon: "folder.fill", selection: $selection)
             StudioTabButton(tab: .editor, title: "Chỉnh sửa", icon: "slider.horizontal.3", selection: $selection)
             StudioTabButton(tab: .guide, title: "Hướng dẫn", icon: "questionmark.circle.fill", selection: $selection)
-        }.padding(6).background(.ultraThinMaterial, in: Capsule()).overlay { Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1) }.padding(.horizontal, 20).padding(.bottom, 8).padding(.top, 4)
+        }.padding(4).background(.ultraThinMaterial, in: Capsule()).overlay { Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1) }
     }
 }
 
 private struct StudioTabButton: View {
     let tab: StudioTab; let title: String; let icon: String; @Binding var selection: StudioTab
-    var body: some View { Button { selection = tab } label: { VStack(spacing: 3) { Image(systemName: icon).font(.body.weight(.medium)); Text(title).font(.caption.weight(.medium)) }.foregroundStyle(selection == tab ? Color.orange : Color.white).frame(maxWidth: .infinity).padding(.vertical, 8).background(selection == tab ? Color.white.opacity(0.14) : .clear, in: Capsule()) }.buttonStyle(.plain) }
+    var body: some View { Button { selection = tab } label: { VStack(spacing: 2) { Image(systemName: icon).font(.subheadline.weight(.medium)); Text(title).font(.caption2.weight(.medium)) }.foregroundStyle(selection == tab ? Color.orange : Color.white).frame(maxWidth: .infinity).padding(.vertical, 6).background(selection == tab ? Color.white.opacity(0.14) : .clear, in: Capsule()) }.buttonStyle(.plain) }
 }
