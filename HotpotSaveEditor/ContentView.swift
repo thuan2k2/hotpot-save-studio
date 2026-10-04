@@ -19,12 +19,16 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch selectedTab {
-                case .files: fileView
-                case .editor: editMenu
-                case .guide: guideView
+            GeometryReader { geometry in
+                Group {
+                    switch selectedTab {
+                    case .files: fileView
+                    case .editor: editMenu
+                    case .guide: guideView
+                    }
                 }
+                .frame(maxWidth: min(geometry.size.width, 430))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { NavigationLink { SettingsView() } label: { Image(systemName: "gearshape") }; Menu { Button("Xóa dữ liệu giải mã", role: .destructive) { askToClearNow = true } } label: { Image(systemName: "ellipsis.circle") } } }
         }
@@ -33,7 +37,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .tint(.orange)
         // Keep the layout compact even when the phone has an enlarged accessibility text setting.
-        .dynamicTypeSize(.xSmall ... .large)
+        .dynamicTypeSize(.xSmall ... .medium)
         .fileImporter(isPresented: $importing, allowedContentTypes: importTypes, allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { editor.importPlist(from: url) } }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .data, defaultFilename: "hotpot_repacked.bplist") { result in switch result { case .success: askToClearAfterExport = true; case .failure(let error): editor.errorMessage = "Không thể xuất file: \(error.localizedDescription)" } }
         .alert("Xóa dữ liệu giải mã?", isPresented: $askToClearAfterExport) { Button("Giữ lại", role: .cancel) { editor.finishExport(deleteWorkspace: false) }; Button("Xóa", role: .destructive) { editor.finishExport(deleteWorkspace: true) } } message: { Text("Đã xuất hotpot_repacked.bplist. Bạn có muốn xóa dữ liệu giải mã trong vùng làm việc của ứng dụng không?") }
@@ -80,7 +84,25 @@ struct ContentView: View {
 
 private struct QuickEditView: View {
     @EnvironmentObject var editor: SaveEditorModel
-    var body: some View { Form { Section("Chỉnh sửa nhanh") { if !editor.isLoaded { MissingDataView() } else { ForEach(editor.quickFields) { field in ValueField(field: field) } } }; Section("Mở khóa siêu tốc") { ActionButton("Mở khóa toàn bộ món ăn", icon: "fork.knife") { editor.runMassAction("foods") }; ActionButton("Mở khóa cơ sở vật chất", icon: "chair") { editor.runMassAction("facilities") }; ActionButton("Mở khóa khu vực & phòng", icon: "door.left.hand.open") { editor.runMassAction("areas") }; ActionButton("Tối đa thân thiết khách hàng", icon: "heart") { editor.runMassAction("favor") }; ActionButton("Mở khóa nhân viên", icon: "person.3") { editor.runMassAction("staff") }; ActionButton("Hoàn thành toàn bộ nhiệm vụ", icon: "checkmark.seal") { editor.runMassAction("tasks") } } }.navigationTitle("Chỉnh nhanh") }
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Chỉnh sửa nhanh").font(.title3.weight(.bold))
+                Text("Tiền tệ, điểm và tiến độ tài khoản").font(.subheadline).foregroundStyle(.secondary)
+                if !editor.isLoaded { MissingDataView() }
+                else {
+                    StudioCard {
+                        ForEach(editor.quickFields.indices, id: \.self) { index in
+                            QuickValueRow(field: editor.quickFields[index])
+                            if index < editor.quickFields.count - 1 { Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 16) }
+                        }
+                    }
+                }
+                Text("Mở khóa siêu tốc").font(.title3.weight(.bold)).padding(.top, 6)
+                StudioCard { VStack(spacing: 0) { ActionButton("Mở khóa toàn bộ món ăn", icon: "fork.knife") { editor.runMassAction("foods") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa cơ sở vật chất", icon: "chair") { editor.runMassAction("facilities") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa khu vực & phòng", icon: "door.left.hand.open") { editor.runMassAction("areas") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Tối đa thân thiết khách hàng", icon: "heart") { editor.runMassAction("favor") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa nhân viên", icon: "person.3") { editor.runMassAction("staff") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Hoàn thành toàn bộ nhiệm vụ", icon: "checkmark.seal") { editor.runMassAction("tasks") } } }
+            }.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 28)
+        }.background(Color.black).navigationTitle("Chỉnh nhanh").navigationBarTitleDisplayMode(.inline)
+    }
 }
 
 private struct AdvancedView: View {
@@ -108,10 +130,30 @@ private struct EventRewardsView: View { @EnvironmentObject var editor: SaveEdito
 private struct SettingsView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Giao diện") { Toggle("Hiển thị công cụ loại bỏ quảng cáo", isOn: $editor.showAdFreeTool); Text("Khi bật, nút này xuất hiện trong mục VIP, gói nạp và sự kiện.").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("Cài đặt") } }
 
 private struct ValueField: View { @EnvironmentObject var editor: SaveEditorModel; let field: EditField; var body: some View { TextField(field.title, text: Binding(get: { editor.value(for: field.key) }, set: { editor.updateValue($0, key: field.key) })).keyboardType(.numbersAndPunctuation) } }
+private struct QuickValueRow: View {
+    @EnvironmentObject var editor: SaveEditorModel
+    let field: EditField
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(field.title).font(.subheadline.weight(.medium)).foregroundStyle(.white).lineLimit(2)
+                Text("(\(field.detail))").font(.caption).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            TextField("0", text: Binding(get: { editor.value(for: field.key) }, set: { editor.updateValue($0, key: field.key) }))
+                .keyboardType(.numbersAndPunctuation)
+                .multilineTextAlignment(.trailing)
+                .font(.subheadline.monospacedDigit())
+                .frame(width: 122)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(Color.black.opacity(0.35), in: .rect(cornerRadius: 10))
+        }.padding(.horizontal, 16).padding(.vertical, 9)
+    }
+}
 private struct EditableRowsView: View { @Binding var rows: [EditableRow]; let labels: [String]; let empty: String; let save: () -> Void; var body: some View { Group { if rows.isEmpty { ContentUnavailableView(empty, systemImage: "tray") } else { List { ForEach($rows) { $row in EditableRowCard(row: $row, labels: labels) }; Section { Button("Lưu thay đổi", action: save).frame(maxWidth: .infinity).buttonStyle(.borderedProminent).tint(.orange) } } } } } }
 private struct EditableRowCard: View { @Binding var row: EditableRow; let labels: [String]; var body: some View { VStack(alignment: .leading, spacing: 8) { Text(row.identifier.isEmpty ? "Không có ID" : row.identifier).font(.headline); Text(row.subtitle).font(.caption).foregroundStyle(.secondary); ForEach(labels.indices, id: \.self) { index in TextField(labels[index], text: Binding(get: { row.values.indices.contains(index) ? row.values[index] : "" }, set: { value in while row.values.count <= index { row.values.append("") }; row.values[index] = value })).textFieldStyle(.roundedBorder).keyboardType(.numbersAndPunctuation) } }.padding(.vertical, 4) } }
 private struct MenuRow: View { let icon: String; let title: String; let detail: String; var body: some View { Label { VStack(alignment: .leading, spacing: 2) { Text(title).font(.body); Text(detail).font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: icon).font(.body).foregroundStyle(.orange) } } }
-private struct ActionButton: View { let title: String; let icon: String; var tint: Color = .orange; let action: () -> Void; init(_ title: String, icon: String, tint: Color = .orange, action: @escaping () -> Void) { self.title = title; self.icon = icon; self.tint = tint; self.action = action }; var body: some View { Button(action: action) { Label(title, systemImage: icon) }.tint(tint) } }
+private struct ActionButton: View { let title: String; let icon: String; var tint: Color = .orange; let action: () -> Void; init(_ title: String, icon: String, tint: Color = .orange, action: @escaping () -> Void) { self.title = title; self.icon = icon; self.tint = tint; self.action = action }; var body: some View { Button(action: action) { Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 13) }.tint(tint).buttonStyle(.plain) } }
 private struct MissingDataView: View { var body: some View { ContentUnavailableView("Chưa có dữ liệu", systemImage: "doc", description: Text("Hãy nhập PLIST ở tab Tệp.")) } }
 private struct GlassCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { VStack(alignment: .leading, spacing: 6) { content }.frame(maxWidth: .infinity, alignment: .leading).padding(14).background(.thinMaterial, in: .rect(cornerRadius: 18)) } }
 
