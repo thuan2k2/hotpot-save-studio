@@ -162,7 +162,7 @@ final class SaveEditorModel: ObservableObject {
 
     private func encodeBackup(_ data: JSONValue) throws -> Data {
         let json = try JSONEncoder().encode(data)
-        return GzipCodec.compress(json).base64EncodedData()
+        return try GzipCodec.compress(json).base64EncodedData()
     }
 
     private var workspaceURL: URL {
