@@ -57,10 +57,18 @@ enum GzipCodec {
 
     private static func transform(_ source: Data, operation: compression_stream_operation) throws -> Data {
         guard !source.isEmpty else { return Data() }
+        // Xcode 26 imports src_ptr/dst_ptr as non-optional pointers. These
+        // one-byte placeholders are replaced before processing the stream.
+        let outputPlaceholder = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
+        let inputPlaceholder = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
+        defer {
+            outputPlaceholder.deallocate()
+            inputPlaceholder.deallocate()
+        }
         var stream = compression_stream(
-            dst_ptr: nil,
+            dst_ptr: outputPlaceholder,
             dst_size: 0,
-            src_ptr: nil,
+            src_ptr: UnsafePointer(inputPlaceholder),
             src_size: 0,
             state: nil
         )
