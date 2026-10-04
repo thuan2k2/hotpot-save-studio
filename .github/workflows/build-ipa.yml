@@ -43,6 +43,10 @@ jobs:
           echo "$CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
           echo "$PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
 
+          # Validate the decoded PKCS#12 before Keychain import. This makes a
+          # bad Base64 value and an incorrect password distinguishable in logs.
+          openssl pkcs12 -legacy -in "$CERT_PATH" -passin env:CERTIFICATE_PASSWORD -noout
+
           security create-keychain -p "$CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
