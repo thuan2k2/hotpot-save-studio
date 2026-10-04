@@ -7,7 +7,18 @@ struct EditField: Identifiable, Hashable {
     var id: String { key }
 }
 struct EditableRow: Identifiable, Hashable {
-    let id = UUID(); let identifier: String; let subtitle: String; var values: [String]; let storageKey: String? = nil
+    let id = UUID()
+    let identifier: String
+    let subtitle: String
+    var values: [String]
+    let storageKey: String?
+
+    init(identifier: String, subtitle: String, values: [String], storageKey: String? = nil) {
+        self.identifier = identifier
+        self.subtitle = subtitle
+        self.values = values
+        self.storageKey = storageKey
+    }
 }
 enum ManualArea: String, CaseIterable, Identifiable {
     case facilities = "Cơ sở vật chất", foods = "Món ăn", customers = "Khách hàng", inventory = "Túi & vật phẩm"
