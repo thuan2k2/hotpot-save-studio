@@ -19,18 +19,15 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                Group {
-                    switch selectedTab {
-                    case .files: fileView
-                    case .editor: editMenu
-                    case .guide: guideView
-                    }
+            Group {
+                switch selectedTab {
+                case .files: fileView
+                case .editor: editMenu
+                case .guide: guideView
                 }
-                .frame(maxWidth: min(geometry.size.width, 430))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .toolbar { ToolbarItemGroup(placement: .topBarTrailing) { NavigationLink { SettingsView() } label: { Image(systemName: "gearshape") }; Menu { Button("Xóa dữ liệu giải mã", role: .destructive) { askToClearNow = true } } label: { Image(systemName: "ellipsis.circle") } } }
+            .frame(maxWidth: 430)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .modifier(KeyboardDoneModifier())
         .safeAreaInset(edge: .bottom, spacing: 0) { StudioTabBar(selection: $selectedTab) }
@@ -49,6 +46,7 @@ struct ContentView: View {
     private var fileView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
+                StudioPageHeader("Tệp", askToClear: $askToClearNow)
                 StudioSectionTitle("Dữ liệu save")
                 StudioCard {
                     Button { importing = true } label: { StudioRow(icon: "folder", title: editor.isLoaded ? editor.importedFileName : "Chọn file PLIST", detail: editor.isLoaded ? "Đã sẵn sàng chỉnh sửa" : "Chọn com.lxqd.hotpotiver.plist từ Files", tint: editor.isLoaded ? .green : .orange) }.buttonStyle(.plain)
@@ -62,23 +60,24 @@ struct ContentView: View {
                     StudioRow(icon: editor.hasWorkspace ? "checkmark.circle.fill" : "circle", title: "Dữ liệu giải mã", detail: editor.hasWorkspace ? "Đang được lưu trong ứng dụng" : "Chưa có dữ liệu giải mã", tint: editor.hasWorkspace ? .green : .secondary, showsChevron: false)
                 }
                 Text("Ứng dụng chỉ xử lý file bạn tự chọn trong Files. File gốc không bị ghi đè.").font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 4)
-            }.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 28)
-        }.background(Color.black).navigationTitle("Tệp").navigationBarTitleDisplayMode(.inline)
+            }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 112)
+        }.background(Color.black).toolbar(.hidden, for: .navigationBar)
     }
 
     private var editMenu: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
+                StudioPageHeader("Chỉnh sửa", askToClear: $askToClearNow)
                 if !editor.isLoaded { StudioNotice("Hãy chọn file PLIST ở tab Tệp trước khi chỉnh sửa.") }
                 StudioSectionTitle("Công cụ chính")
                 StudioCard { StudioLinks([("banknote", "Chỉnh nhanh & mở khóa", "Tiền tệ, cấp độ và mở khóa nhanh", AnyView(QuickEditView())), ("crown", "VIP, gói nạp & sự kiện", "Thẻ tháng, quảng cáo và thẻ mùa giải", AnyView(AdvancedView())), ("square.and.pencil", "Chỉnh sửa từng mục", "Cơ sở, món ăn, khách hàng và túi đồ", AnyView(ManualEditorView())), ("arrow.counterclockwise", "Lượt mua & giới hạn", "Quét và đặt lại lượt, giới hạn, thời gian", AnyView(LimitEditorView()))]) }
                 StudioSectionTitle("Nội dung game")
                 StudioCard { StudioLinks([("puzzlepiece", "Bàn cờ ghép đồ", "Bóng nguyên tố và kho ghép đồ", AnyView(FusionView())), ("checklist", "Nhiệm vụ", "Nhiệm vụ thường, ngày, hoạt động và chương", AnyView(TasksView())), ("cat", "Mèo Thần Tài", "Phần thưởng và lịch sử tương tác", AnyView(LuckyCatView())), ("gamecontroller", "Sự kiện & trò chơi nhỏ", "Điểm và tiền tệ sự kiện", AnyView(MinigameView())), ("storefront", "Cửa hàng & VIP", "Thẻ tháng và tiền tệ cửa hàng", AnyView(ShopVIPView())), ("ticket", "Thẻ mùa giải", "Xu đào lỗ, cấp độ và thử thách", AnyView(GatePassView())), ("gift", "Quà sự kiện", "Đánh dấu nhận các phần thưởng hiện có", AnyView(EventRewardsView()))]) }
-            }.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 28)
-        }.background(Color.black).navigationTitle("Chỉnh sửa").navigationBarTitleDisplayMode(.inline)
+            }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 112)
+        }.background(Color.black).toolbar(.hidden, for: .navigationBar)
     }
     private var guideView: some View {
-        ScrollView { VStack(alignment: .leading, spacing: 26) { StudioSectionTitle("Hướng dẫn sử dụng"); StudioCard { StudioRow(icon: "1.circle", title: "Chọn file save", detail: "Chọn com.lxqd.hotpotiver.plist trong Files", tint: .orange, showsChevron: false); Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 60); StudioRow(icon: "2.circle", title: "Chỉnh sửa dữ liệu", detail: "Mở các nhóm công cụ tại tab Chỉnh sửa", tint: .orange, showsChevron: false); Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 60); StudioRow(icon: "3.circle", title: "Xuất file mới", detail: "Đóng gói thành hotpot_repacked.bplist", tint: .orange, showsChevron: false) }; StudioSectionTitle("An toàn"); StudioNotice("Ứng dụng chỉ thao tác với file bạn tự chọn và không truy cập dữ liệu riêng của game.") }.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 28) }.background(Color.black).navigationTitle("Hướng dẫn").navigationBarTitleDisplayMode(.inline)
+        ScrollView { VStack(alignment: .leading, spacing: 26) { StudioPageHeader("Hướng dẫn", askToClear: $askToClearNow); StudioSectionTitle("Hướng dẫn sử dụng"); StudioCard { StudioRow(icon: "1.circle", title: "Chọn file save", detail: "Chọn com.lxqd.hotpotiver.plist trong Files", tint: .orange, showsChevron: false); Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 60); StudioRow(icon: "2.circle", title: "Chỉnh sửa dữ liệu", detail: "Mở các nhóm công cụ tại tab Chỉnh sửa", tint: .orange, showsChevron: false); Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 60); StudioRow(icon: "3.circle", title: "Xuất file mới", detail: "Đóng gói thành hotpot_repacked.bplist", tint: .orange, showsChevron: false) }; StudioSectionTitle("An toàn"); StudioNotice("Ứng dụng chỉ thao tác với file bạn tự chọn và không truy cập dữ liệu riêng của game.") }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 112) }.background(Color.black).toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -100,7 +99,9 @@ private struct QuickEditView: View {
                 }
                 Text("Mở khóa siêu tốc").font(.title3.weight(.bold)).padding(.top, 6)
                 StudioCard { VStack(spacing: 0) { ActionButton("Mở khóa toàn bộ món ăn", icon: "fork.knife") { editor.runMassAction("foods") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa cơ sở vật chất", icon: "chair") { editor.runMassAction("facilities") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa khu vực & phòng", icon: "door.left.hand.open") { editor.runMassAction("areas") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Tối đa thân thiết khách hàng", icon: "heart") { editor.runMassAction("favor") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa nhân viên", icon: "person.3") { editor.runMassAction("staff") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Hoàn thành toàn bộ nhiệm vụ", icon: "checkmark.seal") { editor.runMassAction("tasks") } } }
-            }.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 28)
+            // The persistent tab pill occupies part of the lower safe area.
+            // Leave room after the final row so it can always be scrolled into view.
+            }.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 112)
         }.background(Color.black).navigationTitle("Chỉnh nhanh").navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -172,6 +173,51 @@ private struct StudioSectionTitle: View {
     let title: String
     init(_ title: String) { self.title = title }
     var body: some View { Text(title).font(.title3.weight(.bold)).foregroundStyle(.white).padding(.horizontal, 4) }
+}
+
+/// A compact in-content header for the three root tabs.  Keeping this inside
+/// the scroll view avoids the oversized iOS 26 glass navigation toolbar while
+/// still letting SwiftUI place it below the Dynamic Island safe area.
+private struct StudioPageHeader: View {
+    let title: String
+    @Binding var askToClear: Bool
+
+    init(_ title: String, askToClear: Binding<Bool>) {
+        self.title = title
+        _askToClear = askToClear
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white)
+
+            Spacer(minLength: 12)
+
+            NavigationLink {
+                SettingsView()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 40, height: 40)
+                    .background(Color.white.opacity(0.10), in: Circle())
+            }
+            .buttonStyle(.plain)
+
+            Menu {
+                Button("Xóa dữ liệu đã giải mã", role: .destructive) {
+                    askToClear = true
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 18, weight: .bold))
+                    .frame(width: 40, height: 40)
+                    .background(Color.white.opacity(0.10), in: Circle())
+            }
+        }
+        .padding(.top, 8)
+    }
 }
 
 private struct StudioCard<Content: View>: View {
