@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject private var editor: SaveEditorModel
@@ -9,14 +10,20 @@ struct ContentView: View {
     @State private var askToClearAfterExport = false
     @State private var askToClearNow = false
 
+    private var importTypes: [UTType] {
+        [.data, UTType(filenameExtension: "plist") ?? .data, UTType(filenameExtension: "bplist") ?? .data]
+    }
+
     var body: some View {
         TabView {
-            NavigationStack { fileView }.tabItem { Label("Tệp", systemImage: "folder.fill") }
-            NavigationStack { editMenu }.tabItem { Label("Chỉnh sửa", systemImage: "slider.horizontal.3") }
-            NavigationStack { guideView }.tabItem { Label("Hướng dẫn", systemImage: "questionmark.circle") }
+            NavigationStack { fileView }.modifier(KeyboardDoneModifier()).tabItem { Label("Tệp", systemImage: "folder.fill") }
+            NavigationStack { editMenu }.modifier(KeyboardDoneModifier()).tabItem { Label("Chỉnh sửa", systemImage: "slider.horizontal.3") }
+            NavigationStack { guideView }.modifier(KeyboardDoneModifier()).tabItem { Label("Hướng dẫn", systemImage: "questionmark.circle") }
         }
         .tint(.orange)
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { editor.importPlist(from: url) } }
+        // Keep the layout compact even when the phone has an enlarged accessibility text setting.
+        .dynamicTypeSize(.xSmall ... .large)
+        .fileImporter(isPresented: $importing, allowedContentTypes: importTypes, allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { editor.importPlist(from: url) } }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .data, defaultFilename: "hotpot_repacked.bplist") { result in switch result { case .success: askToClearAfterExport = true; case .failure(let error): editor.errorMessage = "Không thể xuất file: \(error.localizedDescription)" } }
         .alert("Xóa dữ liệu giải mã?", isPresented: $askToClearAfterExport) { Button("Giữ lại", role: .cancel) { editor.finishExport(deleteWorkspace: false) }; Button("Xóa", role: .destructive) { editor.finishExport(deleteWorkspace: true) } } message: { Text("Đã xuất hotpot_repacked.bplist. Bạn có muốn xóa thư mục Decoded_GameData trong vùng làm việc của app không?") }
         .alert("Xóa dữ liệu giải mã?", isPresented: $askToClearNow) { Button("Hủy", role: .cancel) {}; Button("Xóa", role: .destructive) { editor.clearWorkspace() } } message: { Text("Chỉ xóa dữ liệu nội bộ của app, không ảnh hưởng file gốc trong Files.") }
@@ -26,12 +33,12 @@ struct ContentView: View {
 
     private var fileView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 5) { Text("HOT POT").font(.caption.weight(.bold)).foregroundStyle(.orange); Text("Save Studio").font(.largeTitle.bold()); Text("Chỉnh sửa save trực tiếp trên iPhone").foregroundStyle(.secondary) }
-                GlassCard { Label(editor.isLoaded ? editor.importedFileName : "Chưa chọn save", systemImage: editor.isLoaded ? "checkmark.seal.fill" : "doc.badge.plus").font(.headline).foregroundStyle(editor.isLoaded ? .green : .secondary); Text(editor.status).font(.footnote).foregroundStyle(.secondary) }
-                GlassCard { Label("Quy trình", systemImage: "arrow.triangle.2.circlepath").font(.headline); Text("1. Chọn PLIST từ Files\n2. Chỉnh sửa tại tab Chỉnh sửa\n3. Xuất hotpot_repacked.bplist\n4. Chọn xóa hoặc giữ Decoded_GameData").lineSpacing(5).foregroundStyle(.secondary) }
-                Button { importing = true } label: { Label(editor.isLoaded ? "Chọn file khác" : "Chọn file PLIST", systemImage: "folder.badge.plus").frame(maxWidth: .infinity) }.buttonStyle(.glassProminent)
-                if editor.isLoaded { Button { exportDocument = editor.prepareExport(); exporting = exportDocument != nil } label: { Label("Đóng gói và xuất", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }.buttonStyle(.glassProminent).tint(.orange) }
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) { Text("HOT POT").font(.caption.weight(.bold)).foregroundStyle(.orange); Text("Save Studio").font(.title2.bold()); Text("Chỉnh sửa save trực tiếp trên iPhone").font(.subheadline).foregroundStyle(.secondary) }
+                GlassCard { Label(editor.isLoaded ? editor.importedFileName : "Chưa chọn save", systemImage: editor.isLoaded ? "checkmark.seal.fill" : "doc.badge.plus").font(.subheadline.weight(.semibold)).foregroundStyle(editor.isLoaded ? .green : .secondary); Text(editor.status).font(.caption).foregroundStyle(.secondary) }
+                GlassCard { Label("Quy trình", systemImage: "arrow.triangle.2.circlepath").font(.subheadline.weight(.semibold)); Text("1. Chọn PLIST từ Files\n2. Chỉnh sửa tại tab Chỉnh sửa\n3. Xuất hotpot_repacked.bplist\n4. Chọn xóa hoặc giữ dữ liệu giải mã").font(.subheadline).lineSpacing(2).foregroundStyle(.secondary) }
+                Button { importing = true } label: { Label(editor.isLoaded ? "Chọn file khác" : "Chọn file PLIST", systemImage: "folder.badge.plus").frame(maxWidth: .infinity) }.buttonStyle(.borderedProminent).controlSize(.regular)
+                if editor.isLoaded { Button { exportDocument = editor.prepareExport(); exporting = exportDocument != nil } label: { Label("Đóng gói và xuất", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }.buttonStyle(.borderedProminent).controlSize(.regular).tint(.orange) }
                 if editor.hasWorkspace { Button(role: .destructive) { askToClearNow = true } label: { Label("Xóa Decoded_GameData", systemImage: "trash").frame(maxWidth: .infinity) } }
             }.padding()
         }.navigationTitle("Save Studio").background(Color(.systemGroupedBackground))
@@ -87,13 +94,24 @@ private struct LuckyCatView: View { @EnvironmentObject var editor: SaveEditorMod
 private struct MinigameView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Điểm & tiền tệ") { ForEach(editor.minigameFields) { ValueField(field: $0) } } }.navigationTitle("Sự kiện & Minigame") } }
 private struct ShopVIPView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("VIP & cửa hàng") { ForEach(editor.shopFields) { ValueField(field: $0) } }; Section("Thẻ tháng") { DatePicker("Hạn thẻ tháng thường", selection: Binding(get: { editor.cardEndDate(superCard: false) }, set: { editor.setCardEndDate($0, superCard: false) })); DatePicker("Hạn thẻ tháng cao cấp", selection: Binding(get: { editor.cardEndDate(superCard: true) }, set: { editor.setCardEndDate($0, superCard: true) })) } }.navigationTitle("Cửa hàng & VIP") } }
 private struct GatePassView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Gate Pass") { TextField("Xu đào lỗ (holeCoins)", text: Binding(get: { editor.value(for: "holeCoins") }, set: { editor.updateValue($0, key: "holeCoins") })).keyboardType(.numbersAndPunctuation); Button("Tối đa cấp độ & qua ải mọi mùa") { editor.maxGatePass() }.buttonStyle(.borderedProminent).tint(.orange); Text("Đặt 100.000 điểm, hoàn thành nhiệm vụ và thử thách của mọi Gate Pass hiện có.").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("Gate Pass") } }
-private struct EventRewardsView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { VStack(spacing: 18) { Image(systemName: "gift.fill").font(.system(size: 54)).foregroundStyle(.orange); Text("Nhận quà sự kiện").font(.title2.bold()); Text("Quét các nhóm quà đăng nhập và sự kiện có trong save; phần thưởng chưa nhận được đánh dấu hoàn tất.").multilineTextAlignment(.center).foregroundStyle(.secondary).padding(.horizontal); Button("Quét & nhận toàn bộ quà") { editor.claimEventRewards() }.buttonStyle(.glassProminent).tint(.orange) }.frame(maxWidth: .infinity, maxHeight: .infinity).padding().navigationTitle("Quà sự kiện") } }
+private struct EventRewardsView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { VStack(spacing: 14) { Image(systemName: "gift.fill").font(.system(size: 36)).foregroundStyle(.orange); Text("Nhận quà sự kiện").font(.title3.bold()); Text("Quét các nhóm quà đăng nhập và sự kiện có trong save; phần thưởng chưa nhận được đánh dấu hoàn tất.").font(.subheadline).multilineTextAlignment(.center).foregroundStyle(.secondary).padding(.horizontal); Button("Quét & nhận toàn bộ quà") { editor.claimEventRewards() }.buttonStyle(.borderedProminent).controlSize(.regular).tint(.orange) }.frame(maxWidth: .infinity, maxHeight: .infinity).padding().navigationTitle("Quà sự kiện") } }
 private struct SettingsView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Giao diện") { Toggle("Hiển thị công cụ Loại bỏ quảng cáo", isOn: $editor.showAdFreeTool); Text("Khi bật, nút này xuất hiện trong mục VIP, IAP & sự kiện.").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("Cài đặt") } }
 
 private struct ValueField: View { @EnvironmentObject var editor: SaveEditorModel; let field: EditField; var body: some View { VStack(alignment: .leading, spacing: 3) { TextField(field.title, text: Binding(get: { editor.value(for: field.key) }, set: { editor.updateValue($0, key: field.key) })).keyboardType(.numbersAndPunctuation); if !field.detail.isEmpty { Text(field.detail).font(.caption).foregroundStyle(.secondary) } } } }
 private struct EditableRowsView: View { @Binding var rows: [EditableRow]; let labels: [String]; let empty: String; let save: () -> Void; var body: some View { Group { if rows.isEmpty { ContentUnavailableView(empty, systemImage: "tray") } else { List { ForEach($rows) { $row in EditableRowCard(row: $row, labels: labels) }; Section { Button("Lưu thay đổi", action: save).frame(maxWidth: .infinity).buttonStyle(.borderedProminent).tint(.orange) } } } } } }
 private struct EditableRowCard: View { @Binding var row: EditableRow; let labels: [String]; var body: some View { VStack(alignment: .leading, spacing: 8) { Text(row.identifier.isEmpty ? "Không có ID" : row.identifier).font(.headline); Text(row.subtitle).font(.caption).foregroundStyle(.secondary); ForEach(labels.indices, id: \.self) { index in TextField(labels[index], text: Binding(get: { row.values.indices.contains(index) ? row.values[index] : "" }, set: { value in while row.values.count <= index { row.values.append("") }; row.values[index] = value })).textFieldStyle(.roundedBorder).keyboardType(.numbersAndPunctuation) } }.padding(.vertical, 4) } }
-private struct MenuRow: View { let icon: String; let title: String; let detail: String; var body: some View { Label { VStack(alignment: .leading) { Text(title); Text(detail).font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: icon).foregroundStyle(.orange) } } }
+private struct MenuRow: View { let icon: String; let title: String; let detail: String; var body: some View { Label { VStack(alignment: .leading, spacing: 2) { Text(title).font(.body); Text(detail).font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: icon).font(.body).foregroundStyle(.orange) } } }
 private struct ActionButton: View { let title: String; let icon: String; var tint: Color = .orange; let action: () -> Void; init(_ title: String, icon: String, tint: Color = .orange, action: @escaping () -> Void) { self.title = title; self.icon = icon; self.tint = tint; self.action = action }; var body: some View { Button(action: action) { Label(title, systemImage: icon) }.tint(tint) } }
 private struct MissingDataView: View { var body: some View { ContentUnavailableView("Chưa có dữ liệu", systemImage: "doc", description: Text("Hãy nhập PLIST ở tab Tệp.")) } }
-private struct GlassCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { VStack(alignment: .leading, spacing: 8) { content }.frame(maxWidth: .infinity, alignment: .leading).padding().glassEffect(.regular.tint(.orange.opacity(0.08)), in: .rect(cornerRadius: 24)) } }
+private struct GlassCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { VStack(alignment: .leading, spacing: 6) { content }.frame(maxWidth: .infinity, alignment: .leading).padding(14).background(.thinMaterial, in: .rect(cornerRadius: 18)) } }
+
+private struct KeyboardDoneModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Xong") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+            }
+        }
+    }
+}
