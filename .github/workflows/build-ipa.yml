@@ -37,20 +37,26 @@ jobs:
         run: |
           set -euo pipefail
           CERT_PATH="$RUNNER_TEMP/distribution.p12"
+          COMPATIBLE_CERT_PATH="$RUNNER_TEMP/distribution-compatible.p12"
+          IDENTITY_PEM_PATH="$RUNNER_TEMP/identity.pem"
           PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
 
           echo "$CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
           echo "$PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
 
-          # Validate the decoded PKCS#12 before Keychain import. This makes a
-          # bad Base64 value and an incorrect password distinguishable in logs.
+          # The supplied certificate uses an older PKCS#12 cipher which modern
+          # macOS Keychain cannot import directly. Validate, then repackage it
+          # on the ephemeral runner with a compatible cipher.
           openssl pkcs12 -legacy -in "$CERT_PATH" -passin env:CERTIFICATE_PASSWORD -noout
+          openssl pkcs12 -legacy -in "$CERT_PATH" -passin env:CERTIFICATE_PASSWORD -nodes -out "$IDENTITY_PEM_PATH"
+          openssl pkcs12 -export -in "$IDENTITY_PEM_PATH" -out "$COMPATIBLE_CERT_PATH" -passout env:CERTIFICATE_PASSWORD -name 'Apple Distribution'
+          rm -f "$IDENTITY_PEM_PATH"
 
           security create-keychain -p "$CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12
+          security import "$COMPATIBLE_CERT_PATH" -k "$KEYCHAIN_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
 
