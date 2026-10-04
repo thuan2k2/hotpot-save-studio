@@ -12,7 +12,7 @@ jobs:
     runs-on: macos-26
     env:
       APP_NAME: HotpotSaveEditor
-      BUNDLE_ID: com.thuan2k2.HotpotSaveEditor
+      BUNDLE_ID: app.crystal9093.red1252
       TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
     steps:

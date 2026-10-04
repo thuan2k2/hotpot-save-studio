@@ -7,7 +7,7 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: YES
-    PRODUCT_BUNDLE_IDENTIFIER: com.thuan2k2.HotpotSaveEditor
+    PRODUCT_BUNDLE_IDENTIFIER: app.crystal9093.red1252
     MARKETING_VERSION: 1.0
     CURRENT_PROJECT_VERSION: 1
 targets:
