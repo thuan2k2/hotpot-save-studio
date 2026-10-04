@@ -94,7 +94,9 @@ enum GzipCodec {
                     }
                     stream.dst_ptr = destination
                     stream.dst_size = bufferSize
-                    status = compression_stream_process(&stream, COMPRESSION_STREAM_FINALIZE)
+                    // compression_stream_process imports its flags parameter
+                    // as Int32 in Xcode 26. FINALIZE is bit 0 in the C API.
+                    status = compression_stream_process(&stream, Int32(1))
                     output.append(destination, count: bufferSize - stream.dst_size)
                 }
             } while status == COMPRESSION_STATUS_OK
