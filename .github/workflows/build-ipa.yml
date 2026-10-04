@@ -27,7 +27,7 @@ jobs:
       - name: Install XcodeGen and generate project
         run: |
           brew install xcodegen
-          xcodegen generate --spec HotpotSaveEditor/project.yml
+          xcodegen generate --spec project.yml
 
       - name: Install certificate and provisioning profile
         env:
@@ -67,7 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           xcodebuild archive \
-            -project "$APP_NAME/$APP_NAME.xcodeproj" \
+            -project "$APP_NAME.xcodeproj" \
             -scheme "$APP_NAME" \
             -configuration Release \
             -sdk iphoneos \
