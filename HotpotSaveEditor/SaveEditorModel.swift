@@ -115,7 +115,20 @@ final class SaveEditorModel: ObservableObject {
         case .inventory: for row in rows { setKeyedValue(row.subtitle, id: row.identifier, value: number(row.values.first)) }
         }; persist(); infoMessage = "Đã lưu các thay đổi thủ công."
     }
-    func limitRows() -> [EditableRow] { let words = ["Count", "Limit", "Ts", "Flag", "Purchase"]; return (player.objectValue ?? [:]).flatMap { key, value in guard words.contains(where: { key.localizedCaseInsensitiveContains($0) }), let object = value.objectValue, let keys = object["keys"]?.arrayValue, let values = object["values"]?.arrayValue else { return [] }; return zip(keys, values).map { .init(identifier: string($0.0), subtitle: key, values: [string($0.1)]) } }.sorted { $0.subtitle < $1.subtitle } }
+    func limitRows() -> [EditableRow] {
+        let words = ["Count", "Limit", "Ts", "Flag", "Purchase"]
+        var rows: [EditableRow] = []
+        for (key, value) in player.objectValue ?? [:] {
+            guard words.contains(where: { key.localizedCaseInsensitiveContains($0) }),
+                  let object = value.objectValue,
+                  let keys = object["keys"]?.arrayValue,
+                  let values = object["values"]?.arrayValue else { continue }
+            for (identifier, currentValue) in zip(keys, values) {
+                rows.append(.init(identifier: string(identifier), subtitle: key, values: [string(currentValue)]))
+            }
+        }
+        return rows.sorted { $0.subtitle < $1.subtitle }
+    }
     func saveLimitRows(_ rows: [EditableRow]) { for row in rows { setKeyedValue(row.subtitle, id: row.identifier, value: number(row.values.first)) }; persist(); infoMessage = "Đã lưu lượt và giới hạn." }
     func fusionRows(_ key: String) -> [EditableRow] { keyedValues(key).map { .init(identifier: $0.1, subtitle: key, values: [string($0.2)]) } }
     func saveFusionRows(_ rows: [EditableRow]) { for row in rows { setKeyedValue(row.subtitle, id: row.identifier, value: number(row.values.first)) }; persist(); infoMessage = "Đã lưu dữ liệu ghép đồ." }
