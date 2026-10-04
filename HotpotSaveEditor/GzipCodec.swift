@@ -94,7 +94,7 @@ enum GzipCodec {
                     }
                     stream.dst_ptr = destination
                     stream.dst_size = bufferSize
-                    status = compression_stream_process(&stream, Int32(COMPRESSION_STREAM_FINALIZE))
+                    status = compression_stream_process(&stream, COMPRESSION_STREAM_FINALIZE)
                     output.append(destination, count: bufferSize - stream.dst_size)
                 }
             } while status == COMPRESSION_STATUS_OK
