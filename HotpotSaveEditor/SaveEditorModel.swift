@@ -72,6 +72,19 @@ final class SaveEditorModel: ObservableObject {
     func unlockSkins() { guard var item = player["roleSkinIdUnlock"]?.objectValue, let values = item["values"]?.arrayValue else { infoMessage = "Không tìm thấy roleSkinIdUnlock."; return }; item["values"] = .array(values.map { _ in .bool(true) }); player["roleSkinIdUnlock"] = .object(item); persist(); infoMessage = "Đã mở khóa trang phục nhân viên." }
     func setAdvanced(adCount: String, nextReward: Date, eventScore: String, freeUntil: Date, passScore: String) { updateValue(adCount, key: "rewardAdCount"); player["rewardAdNextRewardTs"] = .number(nextReward.timeIntervalSince1970); updateValue(eventScore, key: "doubleElevenScore"); player["doubleElevenFreeRewardTs"] = .number(freeUntil.timeIntervalSince1970); updateValue(passScore, key: "gatePassScore"); persist(); infoMessage = "Đã lưu quảng cáo và sự kiện." }
     func dateValue(_ key: String) -> Date { Date(timeIntervalSince1970: player[key]?.numberValue ?? Date().timeIntervalSince1970) }
+    func cardEndDate(superCard: Bool) -> Date {
+        let key = superCard ? "superMonthCardData" : "monthCardData"
+        let timestamp = player[key]?.objectValue?["values"]?.arrayValue?.first?.objectValue?["EndTime"]?.numberValue ?? Date().timeIntervalSince1970
+        return Date(timeIntervalSince1970: timestamp)
+    }
+    func setCardEndDate(_ date: Date, superCard: Bool) {
+        let key = superCard ? "superMonthCardData" : "monthCardData"
+        var wrapper = player[key]?.objectValue ?? [:]
+        var values = wrapper["values"]?.arrayValue ?? []
+        if values.isEmpty { values = [.object(["EndTime": .number(date.timeIntervalSince1970)])] }
+        else { var first = values[0].objectValue ?? [:]; first["EndTime"] = .number(date.timeIntervalSince1970); values[0] = .object(first) }
+        wrapper["values"] = .array(values); player[key] = .object(wrapper); persist()
+    }
 
     func manualRows(_ area: ManualArea) -> [EditableRow] {
         switch area {
@@ -99,6 +112,17 @@ final class SaveEditorModel: ObservableObject {
     func luckyRewards() -> [EditableRow] { (player["luckyCatRewardItems"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["itemId"]), subtitle: "Type \(string(o["type"]))", values: [string(o["num"])]) } }
     func saveLuckyRewards(_ rows: [EditableRow]) { player["luckyCatRewardItems"] = .array(rows.map { .object(["type": number($0.subtitle.replacingOccurrences(of: "Type ", with: "")), "itemId": number($0.identifier), "num": number($0.values.first)]) }); persist(); infoMessage = "Đã lưu phần thưởng Mèo Thần Tài." }
     func luckyRecords() -> [EditableRow] { (player["luckyCatRecords"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["talkId"]), subtitle: "Item \(string(o["itemId"]))", values: [string(o["reward"])]) } }
+    func saveLuckyRecords(_ rows: [EditableRow]) {
+        guard var records = player["luckyCatRecords"]?.arrayValue else { return }
+        for index in records.indices where rows.indices.contains(index) {
+            var record = records[index].objectValue ?? [:]
+            record["talkId"] = number(rows[index].identifier)
+            record["itemId"] = number(rows[index].subtitle.replacingOccurrences(of: "Item ", with: ""))
+            record["reward"] = number(rows[index].values.first)
+            records[index] = .object(record)
+        }
+        player["luckyCatRecords"] = .array(records); persist(); infoMessage = "Đã lưu lịch sử Mèo Thần Tài."
+    }
     func maxGatePass() { guard var wrapper = player["gatePassData"]?.objectValue else { infoMessage = "Không có Gate Pass trong save này."; return }; var values = wrapper["values"]?.arrayValue ?? []; values = values.map { value in var pass = value.objectValue ?? [:]; pass["score"] = .number(100000); pass["taskDatas"] = .array((pass["taskDatas"]?.arrayValue ?? []).map { var x = $0.objectValue ?? [:]; x["taskProgress"] = .number(999); x["taskState"] = .number(2); return .object(x) }); pass["challengeDatas"] = .array((pass["challengeDatas"]?.arrayValue ?? []).map { var x = $0.objectValue ?? [:]; x["score"] = .number(999); x["grade"] = .number(99); return .object(x) }); return .object(pass) }; wrapper["values"] = .array(values); player["gatePassData"] = .object(wrapper); persist(); infoMessage = "Đã tối đa Gate Pass." }
     func claimEventRewards() { let keys = ["signInmidAutumnReward", "signInMasParkourReward", "CommonSign2Reward", "christmasDayReward", "signInSevenReward", "CommonSign3Reward", "thanksGivingIntegralOnceReward"]; var count = 0; for key in keys { guard var object = player[key]?.objectValue, let values = object["values"]?.arrayValue else { continue }; object["values"] = .array(values.map { if case .bool(false) = $0 { count += 1; return .bool(true) }; return $0 }); player[key] = .object(object) }; persist(); infoMessage = count == 0 ? "Không tìm thấy quà sự kiện chưa nhận." : "Đã đánh dấu nhận \(count) phần thưởng." }
 
