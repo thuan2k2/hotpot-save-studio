@@ -37,6 +37,10 @@ struct ContentView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
         }
+        // A ZStack otherwise takes the intrinsic height of its children here.
+        // Expanding the root is what makes the scroll viewport and tab bar use
+        // the complete iPhone window rather than a vertically centred section.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea())
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .modifier(KeyboardDoneModifier())
