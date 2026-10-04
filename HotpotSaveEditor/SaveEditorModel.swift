@@ -70,8 +70,21 @@ final class SaveEditorModel: ObservableObject {
     func unlockPurchases(_ key: String) { guard var value = player[key] else { return }; recursiveUnlock(&value); player[key] = value; persist(); infoMessage = "Đã mở khóa gói \(key)." }
     func purchaseKeys() -> [String] { player.objectValue?.keys.filter { $0.localizedCaseInsensitiveContains("iap") || $0.localizedCaseInsensitiveContains("purchase") || $0.localizedCaseInsensitiveContains("pack") }.sorted() ?? [] }
     func unlockSkins() { guard var item = player["roleSkinIdUnlock"]?.objectValue, let values = item["values"]?.arrayValue else { infoMessage = "Không tìm thấy roleSkinIdUnlock."; return }; item["values"] = .array(values.map { _ in .bool(true) }); player["roleSkinIdUnlock"] = .object(item); persist(); infoMessage = "Đã mở khóa trang phục nhân viên." }
-    func setAdvanced(adCount: String, nextReward: Date, eventScore: String, freeUntil: Date, passScore: String) { updateValue(adCount, key: "rewardAdCount"); player["rewardAdNextRewardTs"] = .number(nextReward.timeIntervalSince1970); updateValue(eventScore, key: "doubleElevenScore"); player["doubleElevenFreeRewardTs"] = .number(freeUntil.timeIntervalSince1970); updateValue(passScore, key: "gatePassScore"); persist(); infoMessage = "Đã lưu quảng cáo và sự kiện." }
-    func dateValue(_ key: String) -> Date { Date(timeIntervalSince1970: player[key]?.numberValue ?? Date().timeIntervalSince1970) }
+    func advancedValue(_ key: String) -> String { string(keyedValues(key).first?.2) }
+    func advancedDate(_ key: String) -> Date {
+        let stamp = keyedValues(key).first?.2.numberValue ?? Date().timeIntervalSince1970 * 1_000
+        return Date(timeIntervalSince1970: stamp / 1_000)
+    }
+    func gatePassScore() -> String { string(player["gatePassData"]?.objectValue?["values"]?.arrayValue?.first?.objectValue?["score"]) }
+    func setAdvanced(adCount: String, nextReward: Date, eventScore: String, freeUntil: Date, passScore: String) {
+        setAllKeyedValues("rewardAdCount", value: number(adCount))
+        setAllKeyedValues("rewardAdNextRewardTs", value: .number(nextReward.timeIntervalSince1970 * 1_000))
+        setAllKeyedValues("DoubleElevenScoreAll", value: number(eventScore))
+        setAllKeyedValues("DoubleElevenFreeBuyTs", value: .number(freeUntil.timeIntervalSince1970 * 1_000))
+        guard var gate = player["gatePassData"]?.objectValue else { persist(); infoMessage = "Đã lưu quảng cáo và sự kiện."; return }
+        gate["values"] = .array((gate["values"]?.arrayValue ?? []).map { var pass = $0.objectValue ?? [:]; pass["score"] = number(passScore); return .object(pass) })
+        player["gatePassData"] = .object(gate); persist(); infoMessage = "Đã lưu quảng cáo và sự kiện."
+    }
     func cardEndDate(superCard: Bool) -> Date {
         let key = superCard ? "superMonthCardData" : "monthCardData"
         let timestamp = player[key]?.objectValue?["values"]?.arrayValue?.first?.objectValue?["EndTime"]?.numberValue ?? Date().timeIntervalSince1970
@@ -140,6 +153,7 @@ final class SaveEditorModel: ObservableObject {
     private func completeTasks(_ key: String) -> Int { guard var tasks = player[key]?.arrayValue else { return 0 }; for i in tasks.indices { var task = tasks[i].objectValue ?? [:]; let target = max(task["task_count"]?.numberValue ?? 0, 1); if (task["completeNum"]?.numberValue ?? 0) < target { task["completeNum"] = .number(target) }; tasks[i] = .object(task) }; player[key] = .array(tasks); return tasks.count }
     private func keyedValues(_ key: String) -> [(Int, String, JSONValue)] { guard let object = player[key]?.objectValue, let keys = object["keys"]?.arrayValue, let values = object["values"]?.arrayValue else { return [] }; return zip(keys.indices, zip(keys, values)).map { ($0.0, string($0.1.0), $0.1.1) } }
     private func setKeyedValue(_ key: String, id: String, value: JSONValue) { guard var object = player[key]?.objectValue, let keys = object["keys"]?.arrayValue, var values = object["values"]?.arrayValue, let index = keys.firstIndex(where: { string($0) == id }), values.indices.contains(index) else { return }; values[index] = value; object["values"] = .array(values); player[key] = .object(object) }
+    private func setAllKeyedValues(_ key: String, value: JSONValue) { guard var object = player[key]?.objectValue, let values = object["values"]?.arrayValue else { return }; object["values"] = .array(values.map { _ in value }); player[key] = .object(object) }
     private func recursiveUnlock(_ value: inout JSONValue) { switch value { case .object(var object): for key in object.keys { if ["isBought", "hasPurchased", "isUnlock", "isPremium", "IsUnlcked"].contains(key) { object[key] = .bool(true) } else if var child = object[key] { recursiveUnlock(&child); object[key] = child } }; value = .object(object); case .array(var array): for i in array.indices { recursiveUnlock(&array[i]) }; value = .array(array); default: break } }
     private func string(_ value: JSONValue?) -> String { guard let value else { return "" }; switch value { case .number(let x): return x.rounded() == x ? String(Int64(x)) : String(x); case .string(let x): return x; case .bool(let x): return x ? "true" : "false"; default: return "" } }
     private func boolString(_ value: JSONValue?) -> String { value?.boolValue == true ? "true" : "false" }
