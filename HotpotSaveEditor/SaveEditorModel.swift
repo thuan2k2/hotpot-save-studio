@@ -7,7 +7,7 @@ struct EditField: Identifiable, Hashable {
     var id: String { key }
 }
 struct EditableRow: Identifiable, Hashable {
-    let id = UUID(); let identifier: String; let subtitle: String; var values: [String]
+    let id = UUID(); let identifier: String; let subtitle: String; var values: [String]; let storageKey: String? = nil
 }
 enum ManualArea: String, CaseIterable, Identifiable {
     case facilities = "Cơ sở vật chất", foods = "Món ăn", customers = "Khách hàng", inventory = "Túi & vật phẩm"
@@ -33,10 +33,10 @@ final class SaveEditorModel: ObservableObject {
     private var backup: JSONValue = .object([:])
 
     let quickFields: [EditField] = [
-        .init(key: "gold", title: "Tiền vàng", detail: "Gold"), .init(key: "diamond", title: "Kim cương", detail: "Diamond"), .init(key: "actionPoint", title: "Thể lực", detail: "Action Point"), .init(key: "integral", title: "Điểm sự kiện", detail: "Integral"), .init(key: "staffTrainPoint", title: "Sổ đào tạo", detail: "Staff Train Point"), .init(key: "foodLimitCutPoint", title: "Bánh quy", detail: "Food Limit Cut Point"), .init(key: "playerLevel", title: "Cấp độ cửa hàng", detail: "Player Level"), .init(key: "playerExp", title: "Kinh nghiệm", detail: "Player EXP"), .init(key: "starLevel", title: "Cấp sao", detail: "Star Level"), .init(key: "facilityScore", title: "Điểm cơ sở", detail: "Facility Score"), .init(key: "serverScore", title: "Điểm phục vụ", detail: "Service Score"), .init(key: "foodScore", title: "Điểm thức ăn", detail: "Food Score"), .init(key: "vipPoint", title: "Điểm VIP", detail: "VIP Point"), .init(key: "capsuleToysCoin", title: "Xu gắp thú", detail: "Capsule Toys Coin"), .init(key: "shopSkinCoin", title: "Xu thời trang", detail: "Shop Skin Coin"), .init(key: "crawFishCoin", title: "Xu tôm hùm", detail: "Crawfish Coin"), .init(key: "fireflyCoin", title: "Xu đom đóm", detail: "Firefly Coin")]
+        .init(key: "gold", title: "Tiền vàng", detail: ""), .init(key: "diamond", title: "Kim cương", detail: ""), .init(key: "actionPoint", title: "Thể lực", detail: ""), .init(key: "integral", title: "Điểm sự kiện", detail: ""), .init(key: "staffTrainPoint", title: "Sổ đào tạo nhân viên", detail: ""), .init(key: "foodLimitCutPoint", title: "Bánh quy đột phá món ăn", detail: ""), .init(key: "playerLevel", title: "Cấp độ cửa hàng", detail: ""), .init(key: "playerExp", title: "Điểm kinh nghiệm", detail: ""), .init(key: "starLevel", title: "Cấp sao", detail: ""), .init(key: "facilityScore", title: "Tổng điểm cơ sở", detail: ""), .init(key: "serverScore", title: "Tổng điểm phục vụ", detail: ""), .init(key: "foodScore", title: "Tổng điểm thức ăn", detail: ""), .init(key: "vipPoint", title: "Điểm VIP", detail: ""), .init(key: "capsuleToysCoin", title: "Xu gắp thú", detail: ""), .init(key: "shopSkinCoin", title: "Xu thời trang", detail: ""), .init(key: "crawFishCoin", title: "Xu tôm hùm", detail: ""), .init(key: "fireflyCoin", title: "Xu đom đóm", detail: "")]
     let minigameFields: [EditField] = [
-        .init(key: "crawFishCoin", title: "Xu tôm hùm", detail: "Câu cá"), .init(key: "baitNum", title: "Mồi câu", detail: "Câu tôm hùm"), .init(key: "fireflyCoin", title: "Xu đom đóm", detail: ""), .init(key: "worldCup22Score", title: "Điểm World Cup", detail: ""), .init(key: "stackTower22Score", title: "Điểm Xếp Tháp", detail: ""), .init(key: "scoreXmas23", title: "Điểm Giáng Sinh", detail: ""), .init(key: "thanksGivingIntegral", title: "Điểm Lễ Tạ Ơn", detail: ""), .init(key: "dragonScore", title: "Điểm sự kiện Rồng", detail: ""), .init(key: "dragonEggPoint", title: "Điểm Trứng Rồng", detail: ""), .init(key: "arcadeIntegral", title: "Xu Arcade", detail: "Máy xèng"), .init(key: "capsuleToysCoin", title: "Xu gắp thú", detail: "")]
-    let shopFields: [EditField] = [.init(key: "vipPoint", title: "Điểm VIP", detail: ""), .init(key: "shopSkinCoin", title: "Xu thời trang", detail: "Skin"), .init(key: "shopFoodCoin", title: "Xu thức ăn", detail: "Food"), .init(key: "shopFruitSlotsScore", title: "Điểm máy xèng trái cây", detail: "")]
+        .init(key: "crawFishCoin", title: "Xu tôm hùm", detail: ""), .init(key: "baitNum", title: "Mồi câu tôm hùm", detail: ""), .init(key: "fireflyCoin", title: "Xu đom đóm", detail: ""), .init(key: "worldCup22Score", title: "Điểm World Cup", detail: ""), .init(key: "stackTower22Score", title: "Điểm xếp tháp", detail: ""), .init(key: "scoreXmas23", title: "Điểm Giáng Sinh", detail: ""), .init(key: "thanksGivingIntegral", title: "Điểm Lễ Tạ Ơn", detail: ""), .init(key: "dragonScore", title: "Điểm sự kiện Rồng", detail: ""), .init(key: "dragonEggPoint", title: "Điểm trứng Rồng", detail: ""), .init(key: "arcadeIntegral", title: "Xu máy xèng", detail: ""), .init(key: "capsuleToysCoin", title: "Xu gắp thú", detail: "")]
+    let shopFields: [EditField] = [.init(key: "vipPoint", title: "Điểm VIP", detail: ""), .init(key: "shopSkinCoin", title: "Xu thời trang", detail: ""), .init(key: "shopFoodCoin", title: "Xu thức ăn", detail: ""), .init(key: "shopFruitSlotsScore", title: "Điểm máy xèng trái cây", detail: "")]
 
     func importPlist(from url: URL) {
         do {
@@ -104,7 +104,7 @@ final class SaveEditorModel: ObservableObject {
         case .facilities: return (player["facilityDatas"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["id"]), subtitle: "Vùng \(string(o["region"])) · Loại \(string(o["category"]))", values: [string(o["lv"]), boolString(o["isOwn"])]) }
         case .foods: return (player["foodDatas"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["id"]), subtitle: "Món ăn", values: [string(o["proficiency"]), boolString(o["isUnlock"]), boolString(o["isLimitCut"]), string(o["salesVolume"])]) }
         case .customers: return valuesArray("FavorabilityData").map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["CustomerId"]), subtitle: "Khách hàng", values: [string(o["CurrentLevel"]), string(o["CurrentFavorScore"])]) }
-        case .inventory: return ["pointData", "countData", "bagData"].flatMap { key in keyedValues(key).map { .init(identifier: $0.1, subtitle: key, values: [string($0.2)]) } }
+        case .inventory: return ["pointData", "countData", "bagData"].flatMap { key in keyedValues(key).map { .init(identifier: $0.1, subtitle: displayName(for: key), values: [string($0.2)], storageKey: key) } }
         }
     }
     func saveManualRows(_ rows: [EditableRow], area: ManualArea) {
@@ -112,7 +112,7 @@ final class SaveEditorModel: ObservableObject {
         case .facilities: mutateArrayAt("facilityDatas") { i, item in item["lv"] = number(rows[safe: i]?.values[safe: 0]); item["isOwn"] = .bool(bool(rows[safe: i]?.values[safe: 1])) }
         case .foods: mutateArrayAt("foodDatas") { i, item in item["proficiency"] = number(rows[safe: i]?.values[safe: 0]); let unlocked = bool(rows[safe: i]?.values[safe: 1]); item["isUnlock"] = .bool(unlocked); item["IsUnlcked"] = .bool(unlocked); item["isLimitCut"] = .bool(bool(rows[safe: i]?.values[safe: 2])); item["salesVolume"] = number(rows[safe: i]?.values[safe: 3]) }
         case .customers: mutateValuesAt("FavorabilityData") { i, item in item["CurrentLevel"] = number(rows[safe: i]?.values[safe: 0]); item["CurrentFavorScore"] = number(rows[safe: i]?.values[safe: 1]) }
-        case .inventory: for row in rows { setKeyedValue(row.subtitle, id: row.identifier, value: number(row.values.first)) }
+        case .inventory: for row in rows { setKeyedValue(row.storageKey ?? row.subtitle, id: row.identifier, value: number(row.values.first)) }
         }; persist(); infoMessage = "Đã lưu các thay đổi thủ công."
     }
     func limitRows() -> [EditableRow] {
@@ -124,36 +124,36 @@ final class SaveEditorModel: ObservableObject {
                   let keys = object["keys"]?.arrayValue,
                   let values = object["values"]?.arrayValue else { continue }
             for (identifier, currentValue) in zip(keys, values) {
-                rows.append(.init(identifier: string(identifier), subtitle: key, values: [string(currentValue)]))
+                rows.append(.init(identifier: string(identifier), subtitle: displayName(for: key), values: [string(currentValue)], storageKey: key))
             }
         }
         return rows.sorted { $0.subtitle < $1.subtitle }
     }
-    func saveLimitRows(_ rows: [EditableRow]) { for row in rows { setKeyedValue(row.subtitle, id: row.identifier, value: number(row.values.first)) }; persist(); infoMessage = "Đã lưu lượt và giới hạn." }
-    func fusionRows(_ key: String) -> [EditableRow] { keyedValues(key).map { .init(identifier: $0.1, subtitle: key, values: [string($0.2)]) } }
-    func saveFusionRows(_ rows: [EditableRow]) { for row in rows { setKeyedValue(row.subtitle, id: row.identifier, value: number(row.values.first)) }; persist(); infoMessage = "Đã lưu dữ liệu ghép đồ." }
+    func saveLimitRows(_ rows: [EditableRow]) { for row in rows { setKeyedValue(row.storageKey ?? row.subtitle, id: row.identifier, value: number(row.values.first)) }; persist(); infoMessage = "Đã lưu lượt và giới hạn." }
+    func fusionRows(_ key: String) -> [EditableRow] { keyedValues(key).map { .init(identifier: $0.1, subtitle: displayName(for: key), values: [string($0.2)], storageKey: key) } }
+    func saveFusionRows(_ rows: [EditableRow]) { for row in rows { setKeyedValue(row.storageKey ?? row.subtitle, id: row.identifier, value: number(row.values.first)) }; persist(); infoMessage = "Đã lưu dữ liệu ghép đồ." }
     func taskRows(_ area: TaskArea) -> [EditableRow] { (player[area.key]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["taskId"] ?? o["id"]), subtitle: area.rawValue, values: [string(o["completeNum"]), string(o["task_count"])]) } }
     func saveTaskRows(_ rows: [EditableRow], area: TaskArea) { mutateArrayAt(area.key) { i, item in item["completeNum"] = number(rows[safe: i]?.values[safe: 0]) }; persist(); infoMessage = "Đã lưu nhiệm vụ." }
     func maxTasks(_ area: TaskArea) { let count = completeTasks(area.key); persist(); infoMessage = "Đã hoàn thành \(count) nhiệm vụ." }
-    func luckyRewards() -> [EditableRow] { (player["luckyCatRewardItems"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["itemId"]), subtitle: "Type \(string(o["type"]))", values: [string(o["num"])]) } }
-    func saveLuckyRewards(_ rows: [EditableRow]) { player["luckyCatRewardItems"] = .array(rows.map { .object(["type": number($0.subtitle.replacingOccurrences(of: "Type ", with: "")), "itemId": number($0.identifier), "num": number($0.values.first)]) }); persist(); infoMessage = "Đã lưu phần thưởng Mèo Thần Tài." }
-    func luckyRecords() -> [EditableRow] { (player["luckyCatRecords"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["talkId"]), subtitle: "Item \(string(o["itemId"]))", values: [string(o["reward"])]) } }
+    func luckyRewards() -> [EditableRow] { (player["luckyCatRewardItems"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["itemId"]), subtitle: "Loại \(string(o["type"]))", values: [string(o["num"])]) } }
+    func saveLuckyRewards(_ rows: [EditableRow]) { player["luckyCatRewardItems"] = .array(rows.map { .object(["type": number($0.subtitle.replacingOccurrences(of: "Loại ", with: "")), "itemId": number($0.identifier), "num": number($0.values.first)]) }); persist(); infoMessage = "Đã lưu phần thưởng Mèo Thần Tài." }
+    func luckyRecords() -> [EditableRow] { (player["luckyCatRecords"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["talkId"]), subtitle: "Vật phẩm \(string(o["itemId"]))", values: [string(o["reward"])]) } }
     func saveLuckyRecords(_ rows: [EditableRow]) {
         guard var records = player["luckyCatRecords"]?.arrayValue else { return }
         for index in records.indices where rows.indices.contains(index) {
             var record = records[index].objectValue ?? [:]
             record["talkId"] = number(rows[index].identifier)
-            record["itemId"] = number(rows[index].subtitle.replacingOccurrences(of: "Item ", with: ""))
+            record["itemId"] = number(rows[index].subtitle.replacingOccurrences(of: "Vật phẩm ", with: ""))
             record["reward"] = number(rows[index].values.first)
             records[index] = .object(record)
         }
         player["luckyCatRecords"] = .array(records); persist(); infoMessage = "Đã lưu lịch sử Mèo Thần Tài."
     }
-    func maxGatePass() { guard var wrapper = player["gatePassData"]?.objectValue else { infoMessage = "Không có Gate Pass trong save này."; return }; var values = wrapper["values"]?.arrayValue ?? []; values = values.map { value in var pass = value.objectValue ?? [:]; pass["score"] = .number(100000); pass["taskDatas"] = .array((pass["taskDatas"]?.arrayValue ?? []).map { var x = $0.objectValue ?? [:]; x["taskProgress"] = .number(999); x["taskState"] = .number(2); return .object(x) }); pass["challengeDatas"] = .array((pass["challengeDatas"]?.arrayValue ?? []).map { var x = $0.objectValue ?? [:]; x["score"] = .number(999); x["grade"] = .number(99); return .object(x) }); return .object(pass) }; wrapper["values"] = .array(values); player["gatePassData"] = .object(wrapper); persist(); infoMessage = "Đã tối đa Gate Pass." }
+    func maxGatePass() { guard var wrapper = player["gatePassData"]?.objectValue else { infoMessage = "Không có thẻ mùa giải trong save này."; return }; var values = wrapper["values"]?.arrayValue ?? []; values = values.map { value in var pass = value.objectValue ?? [:]; pass["score"] = .number(100000); pass["taskDatas"] = .array((pass["taskDatas"]?.arrayValue ?? []).map { var x = $0.objectValue ?? [:]; x["taskProgress"] = .number(999); x["taskState"] = .number(2); return .object(x) }); pass["challengeDatas"] = .array((pass["challengeDatas"]?.arrayValue ?? []).map { var x = $0.objectValue ?? [:]; x["score"] = .number(999); x["grade"] = .number(99); return .object(x) }); return .object(pass) }; wrapper["values"] = .array(values); player["gatePassData"] = .object(wrapper); persist(); infoMessage = "Đã tối đa thẻ mùa giải." }
     func claimEventRewards() { let keys = ["signInmidAutumnReward", "signInMasParkourReward", "CommonSign2Reward", "christmasDayReward", "signInSevenReward", "CommonSign3Reward", "thanksGivingIntegralOnceReward"]; var count = 0; for key in keys { guard var object = player[key]?.objectValue, let values = object["values"]?.arrayValue else { continue }; object["values"] = .array(values.map { if case .bool(false) = $0 { count += 1; return .bool(true) }; return $0 }); player[key] = .object(object) }; persist(); infoMessage = count == 0 ? "Không tìm thấy quà sự kiện chưa nhận." : "Đã đánh dấu nhận \(count) phần thưởng." }
 
     func prepareExport() -> BinaryPlistDocument? { guard isLoaded else { return nil }; do { var output = sourcePlist; output["key_player_data"] = try encodePlayer(player); output["Data_BackUp"] = try encodeBackup(backup); status = "Đã đóng gói Binary PLIST. Chọn nơi lưu trong Files."; return .init(data: try PropertyListSerialization.data(fromPropertyList: output, format: .binary, options: 0)) } catch { errorMessage = error.localizedDescription; return nil } }
-    func finishExport(deleteWorkspace: Bool) { guard deleteWorkspace else { infoMessage = "Đã xuất file. Dữ liệu giải mã vẫn được giữ trong app."; return }; clearWorkspace(); infoMessage = "Đã xuất file và xóa Decoded_GameData khỏi app." }
+    func finishExport(deleteWorkspace: Bool) { guard deleteWorkspace else { infoMessage = "Đã xuất file. Dữ liệu giải mã vẫn được giữ trong ứng dụng."; return }; clearWorkspace(); infoMessage = "Đã xuất file và xóa dữ liệu giải mã khỏi ứng dụng." }
     func clearWorkspace() { do { if FileManager.default.fileExists(atPath: workspaceURL.path) { try FileManager.default.removeItem(at: workspaceURL) }; hasWorkspace = false; status = "Đã xóa dữ liệu giải mã khỏi app." } catch { errorMessage = error.localizedDescription } }
     private func ensureLoaded() -> Bool { guard isLoaded else { errorMessage = "Hãy chọn file PLIST trước."; return false }; return true }
     private func persist() { do { try writeWorkspace() } catch { errorMessage = error.localizedDescription } }
@@ -169,6 +169,10 @@ final class SaveEditorModel: ObservableObject {
     private func setAllKeyedValues(_ key: String, value: JSONValue) { guard var object = player[key]?.objectValue, let values = object["values"]?.arrayValue else { return }; object["values"] = .array(values.map { _ in value }); player[key] = .object(object) }
     private func recursiveUnlock(_ value: inout JSONValue) { switch value { case .object(var object): for key in object.keys { if ["isBought", "hasPurchased", "isUnlock", "isPremium", "IsUnlcked"].contains(key) { object[key] = .bool(true) } else if var child = object[key] { recursiveUnlock(&child); object[key] = child } }; value = .object(object); case .array(var array): for i in array.indices { recursiveUnlock(&array[i]) }; value = .array(array); default: break } }
     private func string(_ value: JSONValue?) -> String { guard let value else { return "" }; switch value { case .number(let x): return x.rounded() == x ? String(Int64(x)) : String(x); case .string(let x): return x; case .bool(let x): return x ? "true" : "false"; default: return "" } }
+    private func displayName(for key: String) -> String {
+        let names = ["pointData": "Dữ liệu điểm", "countData": "Dữ liệu số lượng", "bagData": "Túi đồ", "fusionElementBalls": "Bóng nguyên tố", "fusionStockItems": "Kho ghép đồ"]
+        return names[key] ?? "Dữ liệu cấu hình"
+    }
     private func boolString(_ value: JSONValue?) -> String { value?.boolValue == true ? "true" : "false" }
     private func bool(_ value: String?) -> Bool { ["true", "1", "yes", "y"].contains((value ?? "").lowercased()) }
     private func number(_ value: String?) -> JSONValue { .number(Double(value ?? "0") ?? 0) }
