@@ -72,7 +72,14 @@ struct ContentView: View {
     private var tabBinding: Binding<StudioTab> { Binding(get: { selectedTab }, set: { newTab in guard newTab != selectedTab else { return }; navigationPath = NavigationPath(); withAnimation(.snappy(duration: 0.28, extraBounce: 0.08)) { selectedTab = newTab } }) }
     private var errorPresented: Binding<Bool> { Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } }) }
     private var infoPresented: Binding<Bool> { Binding(get: { editor.infoMessage != nil }, set: { if !$0 { editor.infoMessage = nil } }) }
-    private func exportNow() { exportDocument = editor.prepareExport(); exporting = exportDocument != nil }
+    private func exportNow() {
+        guard let document = editor.prepareExport() else { return }
+        // The document must be installed in state before presenting the system
+        // Files sheet. Deferring the presentation by one run-loop prevents
+        // iOS from discarding the exporter when a button also ends editing.
+        exportDocument = document
+        DispatchQueue.main.async { exporting = true }
+    }
     private func importLuckyCatalog(from url: URL) {
         do {
             let acquired = url.startAccessingSecurityScopedResource()
@@ -158,8 +165,35 @@ private struct QuickEditView: View {
 
 private struct AdvancedView: View {
     @EnvironmentObject var editor: SaveEditorModel
-    @State private var adCount = ""; @State private var eventScore = ""; @State private var passScore = ""; @State private var nextReward = Date(); @State private var freeUntil = Date()
-    var body: some View { Form { Section("Thẻ tháng") { Button("Gia hạn thẻ tháng (+30 ngày)") { editor.extendCard(superCard: false) }.tint(.orange) } }.navigationTitle("VIP & thẻ tháng") }
+    @State private var previousExpiry = Date()
+    @State private var updatedExpiry = Date()
+
+    var body: some View {
+        Form {
+            Section("Thẻ tháng") {
+                LabeledContent("Thời hạn hiện tại") {
+                    Text(previousExpiry.formatted(date: .abbreviated, time: .shortened))
+                        .multilineTextAlignment(.trailing)
+                }
+                LabeledContent("Thời hạn sau chỉnh sửa") {
+                    Text(updatedExpiry.formatted(date: .abbreviated, time: .shortened))
+                        .foregroundStyle(.orange)
+                        .multilineTextAlignment(.trailing)
+                }
+                Button("Gia hạn thẻ tháng (+30 ngày)") {
+                    editor.extendCard(superCard: false)
+                    updatedExpiry = editor.cardEndDate(superCard: false)
+                }
+                .tint(.orange)
+            }
+        }
+        .navigationTitle("VIP & thẻ tháng")
+        .onAppear {
+            let current = editor.cardEndDate(superCard: false)
+            previousExpiry = current
+            updatedExpiry = current
+        }
+    }
 }
 
 private struct ManualEditorView: View {
@@ -205,7 +239,7 @@ private struct LuckyCatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .padding(.bottom, 24)
+            .padding(.bottom, 112)
         }
         .background(Color(uiColor: .systemBackground))
         .navigationTitle("Mèo Thần Tài")
@@ -224,7 +258,43 @@ private struct LuckyCatView: View {
         .onAppear { rows = editor.luckyRewards() }
     }
 }
-private struct MinigameView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Điểm & tiền tệ") { ForEach(editor.minigameFields) { DetailedValueField(field: $0) } } }.navigationTitle("Sự kiện & trò chơi nhỏ").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Lưu") { editor.infoMessage = "Đã lưu dữ liệu sự kiện và trò chơi nhỏ." } } } } }
+private struct MinigameView: View {
+    @EnvironmentObject var editor: SaveEditorModel
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Điểm & tiền tệ").font(.title3.weight(.bold))
+                Text("Chỉnh điểm và tiền tệ của các sự kiện, trò chơi nhỏ.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if !editor.isLoaded {
+                    MissingDataView()
+                } else {
+                    StudioCard {
+                        ForEach(editor.minigameFields.indices, id: \.self) { index in
+                            QuickValueRow(field: editor.minigameFields[index])
+                            if index < editor.minigameFields.count - 1 {
+                                Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .padding(.bottom, 112)
+        }
+        .background(Color(uiColor: .systemBackground))
+        .navigationTitle("Sự kiện & trò chơi nhỏ")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Lưu") { editor.infoMessage = "Đã lưu dữ liệu sự kiện và trò chơi nhỏ." }
+                    .disabled(!editor.isLoaded)
+            }
+        }
+    }
+}
 private struct ShopVIPView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Đặc quyền VIP & thẻ tháng") { ForEach(editor.shopFields.prefix(1)) { DetailedValueField(field: $0) }; DatePicker("Hạn thẻ tháng thường", selection: Binding(get: { editor.cardEndDate(superCard: false) }, set: { editor.setCardEndDate($0, superCard: false) })); DatePicker("Hạn thẻ tháng cao cấp", selection: Binding(get: { editor.cardEndDate(superCard: true) }, set: { editor.setCardEndDate($0, superCard: true) })) }; Section("Tiền tệ cửa hàng đặc biệt") { ForEach(editor.shopFields.dropFirst()) { DetailedValueField(field: $0) } } }.navigationTitle("Cửa hàng & VIP").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Lưu") { editor.infoMessage = "Đã lưu dữ liệu cửa hàng và VIP." } } } } }
 private struct GatePassView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Thẻ mùa giải") { TextField("Xu đào lỗ", text: Binding(get: { editor.value(for: "holeCoins") }, set: { editor.updateValue($0, key: "holeCoins") })).keyboardType(.numbersAndPunctuation); Button("Tối đa cấp độ & qua ải mọi mùa") { editor.maxGatePass() }.buttonStyle(.borderedProminent).tint(.orange); Text("Đặt 100.000 điểm, hoàn thành nhiệm vụ và thử thách của mọi thẻ mùa giải hiện có.").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("Thẻ mùa giải") } }
 private struct EventRewardsView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { VStack(spacing: 14) { Image(systemName: "gift.fill").font(.system(size: 36)).foregroundStyle(.orange); Text("Nhận quà sự kiện").font(.title3.bold()); Text("Quét các nhóm quà đăng nhập và sự kiện có trong save; phần thưởng chưa nhận được đánh dấu hoàn tất.").font(.subheadline).multilineTextAlignment(.center).foregroundStyle(.secondary).padding(.horizontal); Button("Quét & nhận toàn bộ quà") { editor.claimEventRewards() }.buttonStyle(.borderedProminent).controlSize(.regular).tint(.orange) }.frame(maxWidth: .infinity, maxHeight: .infinity).padding().navigationTitle("Quà sự kiện") } }
@@ -314,6 +384,21 @@ private struct ItemCatalogView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section {
+                HStack(spacing: 9) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("Tìm ID hoặc tên vật phẩm", text: $searchText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Xóa nội dung tìm kiếm")
+                    }
+                }
+            }
+
             Section("Item") {
                 ForEach(visibleEntryIDs, id: \.self) { entryID in
                     if let index = entries.firstIndex(where: { $0.id == entryID }) {
@@ -325,7 +410,7 @@ private struct ItemCatalogView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .searchable(text: $searchText, prompt: "Tìm ID hoặc tên vật phẩm")
+        .safeAreaPadding(.bottom, 86)
         .navigationTitle("Danh sách Item")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
