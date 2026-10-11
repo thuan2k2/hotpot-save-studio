@@ -155,8 +155,8 @@ private struct QuickEditView: View {
                 Text("Mở khóa siêu tốc").font(.title3.weight(.bold)).padding(.top, 6)
                 StudioCard { VStack(spacing: 0) { ActionButton("Mở khóa toàn bộ món ăn", icon: "fork.knife") { editor.runMassAction("foods") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa cơ sở vật chất", icon: "chair") { editor.runMassAction("facilities") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa khu vực & phòng", icon: "door.left.hand.open") { editor.runMassAction("areas") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Tối đa thân thiết khách hàng", icon: "heart") { editor.runMassAction("favor") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa nhân viên", icon: "person.3") { editor.runMassAction("staff") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Hoàn thành toàn bộ nhiệm vụ", icon: "checkmark.seal") { editor.runMassAction("tasks") } } }
                 HStack(spacing: 10) {
-                    Button("Lưu các chỉnh sửa") { editor.infoMessage = "Đã lưu các chỉnh sửa trong vùng làm việc." }.buttonStyle(.bordered).tint(.studioAccent)
-                    Button("Đóng gói và xuất", action: onExport).buttonStyle(.borderedProminent).tint(.studioAccent)
+                    Button("Lưu các chỉnh sửa") { editor.infoMessage = "Đã lưu các chỉnh sửa trong vùng làm việc." }.buttonStyle(.bordered).tint(Color.studioAccent)
+                    Button("Đóng gói và xuất", action: onExport).buttonStyle(.borderedProminent).tint(Color.studioAccent)
                 }.frame(maxWidth: .infinity)
                 Button("Đưa về gốc", role: .destructive) { editor.resetToOriginal() }.frame(maxWidth: .infinity).buttonStyle(.bordered)
             // The persistent tab pill occupies part of the lower safe area.
@@ -169,7 +169,7 @@ private struct QuickEditView: View {
 private struct AdvancedView: View {
     @EnvironmentObject var editor: SaveEditorModel
     @State private var adCount = ""; @State private var eventScore = ""; @State private var passScore = ""; @State private var nextReward = Date(); @State private var freeUntil = Date()
-    var body: some View { Form { Section("Thẻ tháng") { Button("Gia hạn thẻ tháng (+30 ngày)") { editor.extendCard(superCard: false) }.tint(.studioAccent) } }.navigationTitle("VIP & thẻ tháng") }
+    var body: some View { Form { Section("Thẻ tháng") { Button("Gia hạn thẻ tháng (+30 ngày)") { editor.extendCard(superCard: false) }.tint(Color.studioAccent) } }.navigationTitle("VIP & thẻ tháng") }
 }
 
 private struct ManualEditorView: View {
@@ -195,7 +195,7 @@ private struct SettingsHomeView: View {
     @Binding var importingCatalog: Bool
     var body: some View {
         Form {
-            Section("Ứng dụng") { HStack { Image(systemName: "app.fill").font(.title).foregroundStyle(.studioAccent).frame(width: 48, height: 48).background(Color.studioAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: 11)); VStack(alignment: .leading) { Text("Hotpot Save Studio").font(.headline); Text("Phiên bản 1.0").foregroundStyle(.secondary) } } }
+            Section("Ứng dụng") { HStack { Image(systemName: "app.fill").font(.title).foregroundStyle(Color.studioAccent).frame(width: 48, height: 48).background(Color.studioAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: 11)); VStack(alignment: .leading) { Text("Hotpot Save Studio").font(.headline); Text("Phiên bản 1.0").foregroundStyle(.secondary) } } }
             Section("Giao diện") { Picker("Ngôn ngữ", selection: $editor.language) { Text("Tiếng Việt").tag("vi"); Text("English").tag("en") }; Picker("Màu UI", selection: $editor.accentName) { ForEach(["Hệ thống", "Đỏ", "Cam", "Vàng", "Lục", "Lam", "Chàm", "Tím"], id: \.self) { Text($0) } }; Picker("Chế độ", selection: $editor.appearance) { Text("Hệ thống").tag("Hệ thống"); Text("Sáng").tag("Sáng"); Text("Tối").tag("Tối") } }
             Section("Dữ liệu Mèo Thần Tài") { Button("Xuất dữ liệu Mèo thần tài") { catalogExport = LuckyCatalogDocument(catalog: editor.itemCatalog) }; Button("Nhập dữ liệu Mèo thần tài") { importingCatalog = true } }
             Section("Dữ liệu ứng dụng") { Button("Xóa dữ liệu đã giải mã", role: .destructive) { askToClear = true } }
