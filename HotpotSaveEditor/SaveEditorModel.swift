@@ -8,8 +8,8 @@ struct EditField: Identifiable, Hashable {
 }
 struct EditableRow: Identifiable, Hashable {
     let id = UUID()
-    let identifier: String
-    let subtitle: String
+    var identifier: String
+    var subtitle: String
     var values: [String]
     let storageKey: String?
 
@@ -39,15 +39,21 @@ final class SaveEditorModel: ObservableObject {
     @Published var infoMessage: String?
     @Published private(set) var hasWorkspace = false
     @Published var showAdFreeTool = false
+    @Published var language = "vi"
+    @Published var accentName = "Hệ thống"
+    @Published private(set) var itemCatalog: [String: String] = [:]
     private var sourcePlist: [String: Any] = [:]
     private var player: JSONValue = .object([:])
     private var backup: JSONValue = .object([:])
+    private var originalPlayer: JSONValue = .object([:])
+
+    init() { loadItemCatalog() }
 
     let quickFields: [EditField] = [
         .init(key: "gold", title: "Tiền vàng", detail: "Gold"), .init(key: "diamond", title: "Kim cương", detail: "Diamond"), .init(key: "actionPoint", title: "Thể lực", detail: "Action Point"), .init(key: "integral", title: "Điểm sự kiện", detail: "Integral"), .init(key: "staffTrainPoint", title: "Sổ đào tạo", detail: "Staff Train"), .init(key: "foodLimitCutPoint", title: "Bánh quy", detail: "Food Limit Cut"), .init(key: "playerLevel", title: "Cấp độ cửa hàng", detail: "Level"), .init(key: "playerExp", title: "Điểm kinh nghiệm", detail: "Player Exp"), .init(key: "starLevel", title: "Cấp sao", detail: "Star Level"), .init(key: "facilityScore", title: "Tổng điểm cơ sở", detail: "Facility Score"), .init(key: "serverScore", title: "Tổng điểm phục vụ", detail: "Service Score"), .init(key: "foodScore", title: "Tổng điểm thức ăn", detail: "Food Score"), .init(key: "vipPoint", title: "Điểm VIP", detail: "Vip Point"), .init(key: "capsuleToysCoin", title: "Xu gắp thú", detail: "Capsule Toys"), .init(key: "shopSkinCoin", title: "Xu thời trang", detail: "Skin Coin"), .init(key: "crawFishCoin", title: "Xu tôm hùm", detail: "Crawfish Coin"), .init(key: "fireflyCoin", title: "Xu đom đóm", detail: "Firefly Coin")]
     let minigameFields: [EditField] = [
-        .init(key: "crawFishCoin", title: "Xu tôm hùm", detail: ""), .init(key: "baitNum", title: "Mồi câu tôm hùm", detail: ""), .init(key: "fireflyCoin", title: "Xu đom đóm", detail: ""), .init(key: "worldCup22Score", title: "Điểm World Cup", detail: ""), .init(key: "stackTower22Score", title: "Điểm xếp tháp", detail: ""), .init(key: "scoreXmas23", title: "Điểm Giáng Sinh", detail: ""), .init(key: "thanksGivingIntegral", title: "Điểm Lễ Tạ Ơn", detail: ""), .init(key: "dragonScore", title: "Điểm sự kiện Rồng", detail: ""), .init(key: "dragonEggPoint", title: "Điểm trứng Rồng", detail: ""), .init(key: "arcadeIntegral", title: "Xu máy xèng", detail: ""), .init(key: "capsuleToysCoin", title: "Xu gắp thú", detail: "")]
-    let shopFields: [EditField] = [.init(key: "vipPoint", title: "Điểm VIP", detail: ""), .init(key: "shopSkinCoin", title: "Xu thời trang", detail: ""), .init(key: "shopFoodCoin", title: "Xu thức ăn", detail: ""), .init(key: "shopFruitSlotsScore", title: "Điểm máy xèng trái cây", detail: "")]
+        .init(key: "crawFishCoin", title: "Xu tôm hùm (Câu cá)", detail: "crawFishCoin"), .init(key: "baitNum", title: "Mồi câu tôm hùm", detail: "baitNum"), .init(key: "fireflyCoin", title: "Xu đom đóm", detail: "fireflyCoin"), .init(key: "worldCup22Score", title: "Điểm World Cup", detail: "worldCup22Score"), .init(key: "stackTower22Score", title: "Điểm xếp tháp", detail: "stackTower22Score"), .init(key: "scoreXmas23", title: "Điểm Giáng Sinh", detail: "scoreXmas23"), .init(key: "thanksGivingIntegral", title: "Điểm Lễ Tạ Ơn", detail: "thanksGivingIntegral"), .init(key: "dragonScore", title: "Điểm sự kiện Rồng", detail: "dragonScore"), .init(key: "dragonEggPoint", title: "Điểm trứng Rồng", detail: "dragonEggPoint"), .init(key: "arcadeIntegral", title: "Xu Arcade (Máy xèng)", detail: "arcadeIntegral"), .init(key: "capsuleToysCoin", title: "Xu gắp thú", detail: "capsuleToysCoin")]
+    let shopFields: [EditField] = [.init(key: "vipPoint", title: "Điểm VIP", detail: "vipPoint"), .init(key: "shopSkinCoin", title: "Xu thời trang", detail: "shopSkinCoin"), .init(key: "shopFoodCoin", title: "Xu thức ăn", detail: "shopFoodCoin"), .init(key: "shopFruitSlotsScore", title: "Điểm máy xèng trái cây", detail: "shopFruitSlotsScore")]
 
     func importPlist(from url: URL) {
         do {
@@ -55,7 +61,7 @@ final class SaveEditorModel: ObservableObject {
             let data = try Data(contentsOf: url)
             guard let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else { throw SaveEditorError.invalidPlist }
             guard let rawPlayer = plist["key_player_data"], let rawBackup = plist["Data_BackUp"] else { throw SaveEditorError.requiredKeysMissing }
-            player = try decodePlayer(rawPlayer); backup = try decodeBackup(rawBackup); sourcePlist = plist; importedFileName = url.lastPathComponent; isLoaded = true; try writeWorkspace(); status = "Đã giải mã. Chọn mục ở tab Chỉnh sửa để bắt đầu."
+            player = try decodePlayer(rawPlayer); originalPlayer = player; backup = try decodeBackup(rawBackup); sourcePlist = plist; importedFileName = url.lastPathComponent; isLoaded = true; try writeWorkspace(); status = "Đã giải mã. Chọn mục ở tab Chỉnh sửa để bắt đầu."
         } catch { errorMessage = error.localizedDescription }
     }
     func value(for key: String) -> String { string(player[key]) }
@@ -146,8 +152,13 @@ final class SaveEditorModel: ObservableObject {
     func taskRows(_ area: TaskArea) -> [EditableRow] { (player[area.key]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["taskId"] ?? o["id"]), subtitle: area.rawValue, values: [string(o["completeNum"]), string(o["task_count"])]) } }
     func saveTaskRows(_ rows: [EditableRow], area: TaskArea) { mutateArrayAt(area.key) { i, item in item["completeNum"] = number(rows[safe: i]?.values[safe: 0]) }; persist(); infoMessage = "Đã lưu nhiệm vụ." }
     func maxTasks(_ area: TaskArea) { let count = completeTasks(area.key); persist(); infoMessage = "Đã hoàn thành \(count) nhiệm vụ." }
-    func luckyRewards() -> [EditableRow] { (player["luckyCatRewardItems"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["itemId"]), subtitle: "Loại \(string(o["type"]))", values: [string(o["num"])]) } }
-    func saveLuckyRewards(_ rows: [EditableRow]) { player["luckyCatRewardItems"] = .array(rows.map { .object(["type": number($0.subtitle.replacingOccurrences(of: "Loại ", with: "")), "itemId": number($0.identifier), "num": number($0.values.first)]) }); persist(); infoMessage = "Đã lưu phần thưởng Mèo Thần Tài." }
+    func luckyRewards() -> [EditableRow] { (player["luckyCatRewardItems"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; let itemID = string(o["itemId"]); return .init(identifier: itemID, subtitle: string(o["type"]), values: [string(o["num"]), itemName(for: itemID)]) } }
+    func saveLuckyRewards(_ rows: [EditableRow]) { player["luckyCatRewardItems"] = .array(rows.map { .object(["type": number($0.subtitle), "itemId": number($0.identifier), "num": number($0.values.first)]) }); for row in rows { if row.values.count > 1, !row.values[1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { setItemName(row.values[1], for: row.identifier) } }; persist(); infoMessage = "Đã lưu phần thưởng Mèo Thần Tài." }
+    func addLuckyReward() { var values = player["luckyCatRewardItems"]?.arrayValue ?? []; values.append(.object(["type": .number(0), "itemId": .number(0), "num": .number(0)])); player["luckyCatRewardItems"] = .array(values); persist() }
+    func itemName(for id: String) -> String { itemCatalog[id] ?? "" }
+    func setItemName(_ name: String, for id: String) { guard !id.isEmpty else { return }; itemCatalog[id] = name.trimmingCharacters(in: .whitespacesAndNewlines); UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog") }
+    func importItemCatalog(_ catalog: [String: String]) { itemCatalog.merge(catalog) { _, imported in imported }; UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog"); infoMessage = "Đã nhập \(catalog.count) tên vật phẩm." }
+    func resetToOriginal() { guard isLoaded else { return }; player = originalPlayer; persist(); infoMessage = "Đã đưa dữ liệu về trạng thái vừa giải mã." }
     func luckyRecords() -> [EditableRow] { (player["luckyCatRecords"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["talkId"]), subtitle: "Vật phẩm \(string(o["itemId"]))", values: [string(o["reward"])]) } }
     func saveLuckyRecords(_ rows: [EditableRow]) {
         guard var records = player["luckyCatRecords"]?.arrayValue else { return }
@@ -164,9 +175,15 @@ final class SaveEditorModel: ObservableObject {
     func claimEventRewards() { let keys = ["signInmidAutumnReward", "signInMasParkourReward", "CommonSign2Reward", "christmasDayReward", "signInSevenReward", "CommonSign3Reward", "thanksGivingIntegralOnceReward"]; var count = 0; for key in keys { guard var object = player[key]?.objectValue, let values = object["values"]?.arrayValue else { continue }; object["values"] = .array(values.map { if case .bool(false) = $0 { count += 1; return .bool(true) }; return $0 }); player[key] = .object(object) }; persist(); infoMessage = count == 0 ? "Không tìm thấy quà sự kiện chưa nhận." : "Đã đánh dấu nhận \(count) phần thưởng." }
 
     func prepareExport() -> BinaryPlistDocument? { guard isLoaded else { return nil }; do { var output = sourcePlist; output["key_player_data"] = try encodePlayer(player); output["Data_BackUp"] = try encodeBackup(backup); status = "Đã đóng gói Binary PLIST. Chọn nơi lưu trong Files."; return .init(data: try PropertyListSerialization.data(fromPropertyList: output, format: .binary, options: 0)) } catch { errorMessage = error.localizedDescription; return nil } }
-    func finishExport(deleteWorkspace: Bool) { guard deleteWorkspace else { infoMessage = "Đã xuất file. Dữ liệu giải mã vẫn được giữ trong ứng dụng."; return }; clearWorkspace(); infoMessage = "Đã xuất file và xóa dữ liệu giải mã khỏi ứng dụng." }
+    func finishExport(deleteWorkspace: Bool = true) { clearWorkspace(); infoMessage = "Đã xuất file và xóa dữ liệu giải mã khỏi ứng dụng." }
     func clearWorkspace() { do { if FileManager.default.fileExists(atPath: workspaceURL.path) { try FileManager.default.removeItem(at: workspaceURL) }; hasWorkspace = false; status = "Đã xóa dữ liệu giải mã khỏi app." } catch { errorMessage = error.localizedDescription } }
     private func ensureLoaded() -> Bool { guard isLoaded else { errorMessage = "Hãy chọn file PLIST trước."; return false }; return true }
+    private func loadItemCatalog() {
+        var catalog: [String: String] = [:]
+        if let url = Bundle.main.url(forResource: "ItemCatalog", withExtension: "json"), let data = try? Data(contentsOf: url), let bundled = try? JSONDecoder().decode([String: String].self, from: data) { catalog = bundled }
+        if let saved = UserDefaults.standard.dictionary(forKey: "luckyItemCatalog") as? [String: String] { catalog.merge(saved) { _, current in current } }
+        itemCatalog = catalog
+    }
     private func persist() { do { try writeWorkspace() } catch { errorMessage = error.localizedDescription } }
     private func mutateArray(_ key: String, _ body: (inout JSONValue) -> Void) -> Int { guard var values = player[key]?.arrayValue else { return 0 }; for i in values.indices { body(&values[i]) }; player[key] = .array(values); return values.count }
     private func mutateArrayAt(_ key: String, _ body: (Int, inout JSONValue) -> Void) { guard var values = player[key]?.arrayValue else { return }; for i in values.indices { body(i, &values[i]) }; player[key] = .array(values) }
@@ -199,3 +216,10 @@ private extension JSONValue { var objectValue: [String: JSONValue]? { if case .o
 private extension Array { subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil } }
 enum SaveEditorError: LocalizedError { case invalidPlist, requiredKeysMissing, invalidPlayerData, invalidBackupData, encodingFailed; var errorDescription: String? { switch self { case .invalidPlist: "File không phải Binary PLIST hợp lệ."; case .requiredKeysMissing: "Không tìm thấy key_player_data hoặc Data_BackUp trong file."; case .invalidPlayerData: "key_player_data không phải JSON hợp lệ."; case .invalidBackupData: "Data_BackUp không có Base64/GZIP hợp lệ."; case .encodingFailed: "Không thể mã hóa JSON." } } }
 struct BinaryPlistDocument: FileDocument { static var readableContentTypes: [UTType] { [.data] }; var data: Data; init(data: Data) { self.data = data }; init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }; func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) } }
+struct LuckyCatalogDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    var catalog: [String: String]
+    init(catalog: [String: String]) { self.catalog = catalog }
+    init(configuration: ReadConfiguration) throws { let data = configuration.file.regularFileContents ?? Data(); catalog = try JSONDecoder().decode([String: String].self, from: data) }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: try JSONEncoder().encode(catalog)) }
+}
