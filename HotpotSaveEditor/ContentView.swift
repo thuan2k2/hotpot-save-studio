@@ -50,8 +50,6 @@ struct ContentView: View {
         .modifier(KeyboardDoneModifier())
         .preferredColorScheme(.dark)
         .tint(.orange)
-        // Keep the layout compact even when the phone has an enlarged accessibility text setting.
-        .dynamicTypeSize(.xSmall ... .medium)
         .fileImporter(isPresented: $importing, allowedContentTypes: importTypes, allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { editor.importPlist(from: url) } }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .data, defaultFilename: "hotpot_repacked.bplist") { result in switch result { case .success: editor.finishExport(); case .failure(let error): editor.errorMessage = "Không thể xuất file: \(error.localizedDescription)" } }
         .fileExporter(isPresented: Binding(get: { catalogExport != nil }, set: { if !$0 { catalogExport = nil } }), document: catalogExport, contentType: .json, defaultFilename: "du-lieu-meo-than-tai.json") { _ in catalogExport = nil }
@@ -259,13 +257,14 @@ private struct StudioCard<Content: View>: View {
 
 private struct StudioRow: View {
     let icon: String; let title: String; let detail: String; var tint: Color = .orange; var showsChevron = true
+    @ScaledMetric(relativeTo: .body) private var verticalPadding: CGFloat = 10
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(.system(size: 17, weight: .medium)).foregroundStyle(tint).frame(width: 36, height: 36).background(tint.opacity(0.16), in: .rect(cornerRadius: 10))
             VStack(alignment: .leading, spacing: 2) { Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.white).lineLimit(1); Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             Spacer(minLength: 6)
             if showsChevron { Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary) }
-        }.padding(.horizontal, 13).padding(.vertical, 10).contentShape(.rect)
+        }.padding(.horizontal, 13).padding(.vertical, verticalPadding).contentShape(.rect)
     }
 }
 
