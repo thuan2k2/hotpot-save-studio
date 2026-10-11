@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var askToClearNow = false
     @State private var selectedTab: StudioTab = .home
     @State private var navigationPath = NavigationPath()
+    @State private var navigationStackID = UUID()
     @State private var catalogExport: LuckyCatalogDocument?
     @State private var importingCatalog = false
 
@@ -37,7 +38,7 @@ struct ContentView: View {
             // NavigationLink(destination:) keeps its own presentation state.
             // Recreate the stack when selecting a root tab so a destination
             // such as "VIP & thẻ tháng" cannot remain above the new tab.
-            .id(selectedTab)
+            .id(navigationStackID)
 
             StudioTabBar(selection: tabBinding)
                 .padding(.horizontal, 16)
@@ -79,7 +80,14 @@ struct ContentView: View {
         .alert("Hoàn tất", isPresented: infoPresented) { Button("OK", role: .cancel) {} } message: { Text(editor.infoMessage ?? "") }
     }
 
-    private var tabBinding: Binding<StudioTab> { Binding(get: { selectedTab }, set: { newTab in guard newTab != selectedTab else { return }; navigationPath = NavigationPath(); withAnimation(.snappy(duration: 0.28, extraBounce: 0.08)) { selectedTab = newTab } }) }
+    private var tabBinding: Binding<StudioTab> {
+        Binding(get: { selectedTab }, set: { newTab in
+            navigationPath = NavigationPath()
+            navigationStackID = UUID()
+            guard newTab != selectedTab else { return }
+            withAnimation(.snappy(duration: 0.28, extraBounce: 0.08)) { selectedTab = newTab }
+        })
+    }
     private var errorPresented: Binding<Bool> { Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } }) }
     private var infoPresented: Binding<Bool> { Binding(get: { editor.infoMessage != nil }, set: { if !$0 { editor.infoMessage = nil } }) }
     private var exportPickerPresented: Binding<Bool> {
@@ -102,8 +110,13 @@ struct ContentView: View {
         do {
             let acquired = url.startAccessingSecurityScopedResource()
             defer { if acquired { url.stopAccessingSecurityScopedResource() } }
-            let catalog = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: url))
-            editor.importItemCatalog(catalog)
+            let data = try Data(contentsOf: url)
+            if let payload = try? JSONDecoder().decode(LuckyCatalogPayload.self, from: data) {
+                editor.importItemCatalog(payload.catalog, types: payload.types)
+            } else {
+                // Accept backups created by the older app, which only stored names.
+                editor.importItemCatalog(try JSONDecoder().decode([String: String].self, from: data))
+            }
         } catch { editor.errorMessage = "Không thể nhập dữ liệu Mèo Thần Tài: \(error.localizedDescription)" }
     }
     private var preferredScheme: ColorScheme? {
@@ -168,7 +181,7 @@ private struct QuickEditView: View {
                     }
                 }
                 Text("Mở khóa siêu tốc").font(.title3.weight(.bold)).padding(.top, 6)
-                StudioCard { VStack(spacing: 0) { ActionButton("Mở khóa toàn bộ món ăn", icon: "fork.knife") { editor.runMassAction("foods") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa cơ sở vật chất", icon: "chair") { editor.runMassAction("facilities") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa khu vực & phòng", icon: "door.left.hand.open") { editor.runMassAction("areas") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Tối đa thân thiết khách hàng", icon: "heart") { editor.runMassAction("favor") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa nhân viên", icon: "person.3") { editor.runMassAction("staff") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Hoàn thành toàn bộ nhiệm vụ", icon: "checkmark.seal") { editor.runMassAction("tasks") } } }
+                StudioCard { VStack(spacing: 0) { ActionButton("Mở khóa toàn bộ món ăn", icon: "fork.knife") { editor.runMassAction("foods") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa cơ sở vật chất", icon: "chair") { editor.runMassAction("facilities") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa khu vực & phòng", icon: "door.left.hand.open") { editor.runMassAction("areas") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Tối đa thân thiết khách hàng", icon: "heart") { editor.runMassAction("favor") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa nhân viên", icon: "person.3") { editor.runMassAction("staff") } } }
                 HStack(spacing: 10) {
                     Button("Lưu các chỉnh sửa") { editor.infoMessage = "Đã lưu các chỉnh sửa trong vùng làm việc." }.buttonStyle(.bordered).tint(.orange)
                     Button("Đóng gói và xuất", action: onExport).buttonStyle(.borderedProminent).tint(.orange)
@@ -226,6 +239,13 @@ private struct TasksView: View { @EnvironmentObject var editor: SaveEditorModel;
 private struct LuckyCatView: View {
     @EnvironmentObject var editor: SaveEditorModel
     @State private var rows: [EditableRow] = []
+    @State private var selecting = false
+    @State private var selectedRows = Set<UUID>()
+
+    private func removeRows(withIDs ids: Set<UUID>) {
+        rows.removeAll { ids.contains($0.id) }
+        selectedRows.subtract(ids)
+    }
 
     var body: some View {
         ScrollView {
@@ -241,7 +261,27 @@ private struct LuckyCatView: View {
                     StudioNotice("Chưa có phần thưởng. Nhấn dấu + để thêm một trường mới.")
                 } else {
                     ForEach($rows) { $row in
-                        LuckyRewardCard(row: $row)
+                        HStack(spacing: 9) {
+                            if selecting {
+                                Button {
+                                    if selectedRows.contains(row.id) { selectedRows.remove(row.id) }
+                                    else { selectedRows.insert(row.id) }
+                                } label: {
+                                    Image(systemName: selectedRows.contains(row.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(.title3)
+                                        .foregroundStyle(selectedRows.contains(row.id) ? .orange : .secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            LuckyRewardCard(row: $row)
+                        }
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                removeRows(withIDs: Set([row.id]))
+                            } label: {
+                                Label("Xóa", systemImage: "trash")
+                            }
+                        }
                     }
                 }
 
@@ -263,14 +303,29 @@ private struct LuckyCatView: View {
         .navigationTitle("Mèo Thần Tài")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button { editor.addLuckyReward(); rows = editor.luckyRewards() } label: {
-                    Image(systemName: "plus")
+                Button(selecting ? "Xong" : "Chọn") {
+                    selecting.toggle()
+                    if !selecting { selectedRows.removeAll() }
                 }
-                .disabled(!editor.isLoaded)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Lưu") { editor.saveLuckyRewards(rows) }
-                    .disabled(!editor.isLoaded)
+                if selecting {
+                    Button(role: .destructive) {
+                        removeRows(withIDs: selectedRows)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .disabled(selectedRows.isEmpty)
+                } else {
+                    HStack(spacing: 14) {
+                        Button { editor.addLuckyReward(); rows = editor.luckyRewards() } label: {
+                            Image(systemName: "plus")
+                        }
+                        .disabled(!editor.isLoaded)
+                        Button("Lưu") { editor.saveLuckyRewards(rows) }
+                            .disabled(!editor.isLoaded)
+                    }
+                }
             }
         }
         .onAppear { rows = editor.luckyRewards() }
@@ -327,7 +382,7 @@ private struct SettingsHomeView: View {
         Form {
             Section("Ứng dụng") { HStack { Image(systemName: "app.fill").font(.title).foregroundStyle(.orange).frame(width: 48, height: 48).background(Color.orange.opacity(0.16), in: RoundedRectangle(cornerRadius: 11)); VStack(alignment: .leading) { Text("Hotpot Save Studio").font(.headline); Text("Phiên bản 1.0").foregroundStyle(.secondary) } } }
             Section("Giao diện") { Picker("Chế độ", selection: $editor.appearance) { Text("Hệ thống").tag("Hệ thống"); Text("Sáng").tag("Sáng"); Text("Tối").tag("Tối") } }
-            Section("Dữ liệu Mèo Thần Tài") { Button("Xuất dữ liệu Mèo thần tài") { catalogExport = LuckyCatalogDocument(catalog: editor.itemCatalog) }; Button("Nhập dữ liệu Mèo thần tài") { importingCatalog = true } }
+            Section("Dữ liệu Mèo Thần Tài") { Button("Xuất dữ liệu Mèo thần tài") { catalogExport = LuckyCatalogDocument(catalog: editor.itemCatalog, types: editor.itemTypes) }; Button("Nhập dữ liệu Mèo thần tài") { importingCatalog = true } }
             Section("Dữ liệu ứng dụng") { Button("Xóa dữ liệu đã giải mã", role: .destructive) { askToClear = true } }
             Section("Hướng dẫn") { Text("Chọn file tại Trang chủ, chỉnh sửa tại các tab, sau đó đóng gói và xuất file mới. File gốc trong Files không bị ghi đè.").font(.footnote) }
         }
@@ -364,9 +419,13 @@ private struct LuckyRewardCard: View {
         StudioCard {
             VStack(spacing: 0) {
                 LuckyRewardValueRow(title: "Loại", detail: "Mã loại phần thưởng", value: $row.subtitle, numeric: true)
+                    .disabled(!editor.canEditItemType(for: row.identifier))
                 Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
                 LuckyRewardValueRow(title: "ID vật phẩm", detail: "Mã định danh vật phẩm", value: $row.identifier, numeric: true)
-                    .onChange(of: row.identifier) { _, id in itemName.wrappedValue = editor.itemName(for: id) }
+                    .onChange(of: row.identifier) { _, id in
+                        itemName.wrappedValue = editor.itemName(for: id)
+                        row.subtitle = editor.itemType(for: id)
+                    }
                 Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
                 LuckyRewardValueRow(title: "Tên vật phẩm", detail: "Tự điền từ danh mục; có thể sửa khi được phép", value: itemName)
                     .disabled(!editor.canEditItemName(for: row.identifier))
@@ -381,6 +440,11 @@ private struct ItemCatalogView: View {
     @EnvironmentObject var editor: SaveEditorModel
     @State private var entries: [ItemCatalogEntry] = []
     @State private var searchText = ""
+    @State private var showingAddItem = false
+    @State private var newType = "3"
+    @State private var newItemID = ""
+    @State private var newItemName = ""
+    @State private var newQuantity = "1"
 
     private var visibleEntryIDs: [UUID] {
         let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -394,15 +458,47 @@ private struct ItemCatalogView: View {
         return String(largest + 1)
     }
 
+    private func beginAddingItem() {
+        newType = "3"
+        newItemID = nextCustomItemID
+        newItemName = ""
+        newQuantity = "1"
+        showingAddItem = true
+    }
+
+    private func addItemFromDialog() {
+        let id = newItemID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let type = newType.trimmingCharacters(in: .whitespacesAndNewlines)
+        let quantity = newQuantity.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let numericID = Int(id), numericID >= 3001 else {
+            editor.errorMessage = "ID Item mới phải là số từ 3001 trở lên."
+            return
+        }
+        guard Int(type) != nil else {
+            editor.errorMessage = "Loại phải là số nguyên."
+            return
+        }
+        guard let numericQuantity = Int(quantity), numericQuantity >= 1 else {
+            editor.errorMessage = "Số lượng phải là số nguyên lớn hơn 0."
+            return
+        }
+        guard !entries.contains(where: { $0.itemID == id }) else {
+            editor.errorMessage = "ID Item \(id) đã có trong Danh sách Item."
+            return
+        }
+
+        entries.append(.init(itemID: id, type: type, name: newItemName, isBuiltIn: false))
+        editor.addLuckyReward(type: type, itemID: id, quantity: String(numericQuantity))
+    }
+
     var body: some View {
-        List {
-            Section {
-                Text("ID từ 0 đến 3000 là dữ liệu có sẵn. Chỉ tên đang trống mới có thể được thêm. ID từ 3001 là mục bạn tự thêm, có thể sửa hoặc xóa.")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("ID từ 0 đến 3000 là dữ liệu có sẵn. Chỉ tên đang trống mới có thể được thêm và chỉnh Loại. ID từ 3001 là mục bạn tự thêm, có thể sửa hoặc xóa.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-            }
 
-            Section {
+                StudioCard {
                 HStack(spacing: 9) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("Tìm ID hoặc tên vật phẩm", text: $searchText)
@@ -415,9 +511,10 @@ private struct ItemCatalogView: View {
                             .accessibilityLabel("Xóa nội dung tìm kiếm")
                     }
                 }
-            }
+                }
 
-            Section("Item") {
+                Text("Item").font(.title3.weight(.bold)).padding(.top, 2)
+                LazyVStack(spacing: 12) {
                 ForEach(visibleEntryIDs, id: \.self) { entryID in
                     if let index = entries.firstIndex(where: { $0.id == entryID }) {
                         ItemCatalogEditorRow(entry: $entries[index]) {
@@ -425,16 +522,17 @@ private struct ItemCatalogView: View {
                         }
                     }
                 }
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .padding(.bottom, 112)
         }
-        .listStyle(.insetGrouped)
-        .safeAreaPadding(.bottom, 86)
+        .background(Color(uiColor: .systemBackground))
         .navigationTitle("Danh sách Item")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    entries.append(.init(itemID: nextCustomItemID, name: "", isBuiltIn: false))
-                } label: {
+                Button(action: beginAddingItem) {
                     Image(systemName: "plus")
                 }
             }
@@ -446,6 +544,16 @@ private struct ItemCatalogView: View {
                 }
             }
         }
+        .alert("Thêm Item và phần thưởng", isPresented: $showingAddItem) {
+            TextField("Loại", text: $newType).keyboardType(.numbersAndPunctuation)
+            TextField("ID Item", text: $newItemID).keyboardType(.numbersAndPunctuation)
+            TextField("Tên vật phẩm", text: $newItemName)
+            TextField("Số lượng", text: $newQuantity).keyboardType(.numbersAndPunctuation)
+            Button("Hủy", role: .cancel) {}
+            Button("Thêm", action: addItemFromDialog)
+        } message: {
+            Text("Loại mặc định là 3 và Số lượng mặc định là 1. Khi thêm, app cũng tạo một phần thưởng Mèo Thần Tài tương ứng.")
+        }
         .onAppear { entries = editor.itemCatalogEntries() }
     }
 }
@@ -455,30 +563,56 @@ private struct ItemCatalogEditorRow: View {
     let delete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                TextField("ID item", text: $entry.itemID)
-                    .keyboardType(.numbersAndPunctuation)
+        StudioCard {
+            VStack(spacing: 0) {
+                ItemCatalogValueRow(title: "ID Item", detail: "Mã định danh vật phẩm", value: $entry.itemID, numeric: true)
                     .disabled(entry.isBuiltIn)
+                Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
+                ItemCatalogValueRow(title: "Tên vật phẩm", detail: "Tên hiển thị trong Mèo Thần Tài", value: $entry.name)
+                    .disabled(entry.isBuiltIn && !entry.allowsBuiltInNameEdit)
+                Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
+                ItemCatalogValueRow(title: "Loại", detail: entry.allowsTypeEdit ? "Có thể chỉnh khi chưa có tên" : "Đã xác định theo vật phẩm", value: $entry.type, numeric: true)
+                    .disabled(!entry.allowsTypeEdit)
+
                 if !entry.isBuiltIn {
+                    Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
                     Button(role: .destructive, action: delete) {
-                        Image(systemName: "trash")
+                        Label("Xóa Item tự thêm", systemImage: "trash")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
                     }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Xóa Item")
+                    .buttonStyle(.plain)
                 }
             }
-
-            TextField("Tên vật phẩm", text: $entry.name)
-                .disabled(entry.isBuiltIn && !entry.allowsBuiltInNameEdit)
-
-            Text(entry.isBuiltIn
-                 ? (entry.allowsBuiltInNameEdit ? "Dữ liệu có sẵn chưa có tên: có thể thêm tên." : "Dữ liệu có sẵn: tên vật phẩm đã được khóa.")
-                 : "Item tự thêm: có thể sửa ID, tên hoặc xóa.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 4)
+    }
+}
+
+private struct ItemCatalogValueRow: View {
+    let title: String
+    let detail: String
+    @Binding var value: String
+    var numeric = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            TextField(numeric ? "0" : "Tên", text: $value)
+                .keyboardType(numeric ? .numbersAndPunctuation : .default)
+                .multilineTextAlignment(.trailing)
+                .font(.subheadline.monospacedDigit())
+                .frame(width: 142)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(Color.primary.opacity(0.10), in: .rect(cornerRadius: 10))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
     }
 }
 

@@ -26,14 +26,18 @@ struct ItemCatalogEntry: Identifiable, Hashable {
     let isBuiltIn: Bool
     let allowsBuiltInNameEdit: Bool
     var itemID: String
+    var type: String
     var name: String
 
-    init(itemID: String, name: String, isBuiltIn: Bool) {
+    init(itemID: String, type: String, name: String, isBuiltIn: Bool) {
         self.itemID = itemID
+        self.type = type
         self.name = name
         self.isBuiltIn = isBuiltIn
         allowsBuiltInNameEdit = isBuiltIn && name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+
+    var allowsTypeEdit: Bool { name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 }
 enum ManualArea: String, CaseIterable, Identifiable {
     case facilities = "Cơ sở vật chất", foods = "Món ăn", customers = "Khách hàng", inventory = "Túi & vật phẩm"
@@ -56,6 +60,7 @@ final class SaveEditorModel: ObservableObject {
     @Published var showAdFreeTool = false
     @Published var appearance = "Hệ thống" { didSet { UserDefaults.standard.set(appearance, forKey: "studioAppearance") } }
     @Published private(set) var itemCatalog: [String: String] = [:]
+    @Published private(set) var itemTypes: [String: String] = [:]
     private var sourcePlist: [String: Any] = [:]
     private var player: JSONValue = .object([:])
     private var backup: JSONValue = .object([:])
@@ -167,9 +172,25 @@ final class SaveEditorModel: ObservableObject {
     func saveTaskRows(_ rows: [EditableRow], area: TaskArea) { mutateArrayAt(area.key) { i, item in item["completeNum"] = number(rows[safe: i]?.values[safe: 0]) }; persist(); infoMessage = "Đã lưu nhiệm vụ." }
     func maxTasks(_ area: TaskArea) { let count = completeTasks(area.key); persist(); infoMessage = "Đã hoàn thành \(count) nhiệm vụ." }
     func luckyRewards() -> [EditableRow] { (player["luckyCatRewardItems"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; let itemID = string(o["itemId"]); return .init(identifier: itemID, subtitle: string(o["type"]), values: [string(o["num"]), itemName(for: itemID)]) } }
-    func saveLuckyRewards(_ rows: [EditableRow]) { player["luckyCatRewardItems"] = .array(rows.map { .object(["type": number($0.subtitle), "itemId": number($0.identifier), "num": number($0.values.first)]) }); for row in rows { if row.values.count > 1, !row.values[1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { setItemName(row.values[1], for: row.identifier) } }; persist(); infoMessage = "Đã lưu phần thưởng Mèo Thần Tài." }
-    func addLuckyReward() { var values = player["luckyCatRewardItems"]?.arrayValue ?? []; values.append(.object(["type": .number(0), "itemId": .number(0), "num": .number(0)])); player["luckyCatRewardItems"] = .array(values); persist() }
+    func saveLuckyRewards(_ rows: [EditableRow]) {
+        player["luckyCatRewardItems"] = .array(rows.map { .object(["type": number($0.subtitle), "itemId": number($0.identifier), "num": number($0.values.first)]) })
+        for row in rows {
+            if row.values.count > 1, !row.values[1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { setItemName(row.values[1], for: row.identifier) }
+            setItemType(row.subtitle, for: row.identifier)
+        }
+        persist(); infoMessage = "Đã lưu phần thưởng Mèo Thần Tài."
+    }
+    func addLuckyReward(type: String = "3", itemID: String = "0", quantity: String = "1") {
+        var values = player["luckyCatRewardItems"]?.arrayValue ?? []
+        values.append(.object(["type": number(type), "itemId": number(itemID), "num": number(quantity)]))
+        player["luckyCatRewardItems"] = .array(values)
+        persist()
+    }
     func itemName(for id: String) -> String { itemCatalog[id] ?? "" }
+    func itemType(for id: String) -> String { itemTypes[id] ?? "3" }
+    func canEditItemType(for id: String) -> Bool {
+        itemName(for: id).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     func canEditItemName(for id: String) -> Bool {
         guard let value = Int(id) else { return false }
         return value >= 3001 || (itemCatalog[id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -179,9 +200,14 @@ final class SaveEditorModel: ObservableObject {
         itemCatalog[id] = name.trimmingCharacters(in: .whitespacesAndNewlines)
         UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog")
     }
+    func setItemType(_ type: String, for id: String) {
+        guard !id.isEmpty, Int(type) != nil else { return }
+        itemTypes[id] = type
+        UserDefaults.standard.set(itemTypes, forKey: "luckyItemTypes")
+    }
     func itemCatalogEntries() -> [ItemCatalogEntry] {
         itemCatalog
-            .map { ItemCatalogEntry(itemID: $0.key, name: $0.value, isBuiltIn: (Int($0.key) ?? 3001) <= 3000) }
+            .map { ItemCatalogEntry(itemID: $0.key, type: itemType(for: $0.key), name: $0.value, isBuiltIn: (Int($0.key) ?? 3001) <= 3000) }
             .sorted { lhs, rhs in
                 let left = Int(lhs.itemID) ?? .max
                 let right = Int(rhs.itemID) ?? .max
@@ -190,6 +216,7 @@ final class SaveEditorModel: ObservableObject {
     }
     func saveItemCatalogEntries(_ entries: [ItemCatalogEntry]) -> Bool {
         var result = itemCatalog.filter { (Int($0.key) ?? 3001) <= 3000 }
+        var resultTypes = itemTypes.filter { (Int($0.key) ?? 3001) <= 3000 }
         var usedCustomIDs = Set<String>()
 
         for entry in entries where entry.isBuiltIn {
@@ -198,6 +225,7 @@ final class SaveEditorModel: ObservableObject {
             if entry.allowsBuiltInNameEdit && currentName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 result[entry.itemID] = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
             }
+            if entry.allowsTypeEdit, Int(entry.type) != nil { resultTypes[entry.itemID] = entry.type }
         }
         for entry in entries where !entry.isBuiltIn {
             let id = entry.itemID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -209,15 +237,28 @@ final class SaveEditorModel: ObservableObject {
                 errorMessage = "ID item \(id) bị trùng trong danh sách."
                 return false
             }
+            guard Int(entry.type) != nil else {
+                errorMessage = "Loại của Item \(id) phải là số nguyên."
+                return false
+            }
             result[id] = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            resultTypes[id] = entry.type
         }
 
         itemCatalog = result
+        itemTypes = resultTypes
         UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog")
+        UserDefaults.standard.set(itemTypes, forKey: "luckyItemTypes")
         infoMessage = "Đã lưu Danh sách Item."
         return true
     }
-    func importItemCatalog(_ catalog: [String: String]) { itemCatalog.merge(catalog) { _, imported in imported }; UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog"); infoMessage = "Đã nhập \(catalog.count) tên vật phẩm." }
+    func importItemCatalog(_ catalog: [String: String], types: [String: String] = [:]) {
+        itemCatalog.merge(catalog) { _, imported in imported }
+        itemTypes.merge(types) { _, imported in imported }
+        UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog")
+        UserDefaults.standard.set(itemTypes, forKey: "luckyItemTypes")
+        infoMessage = "Đã nhập \(catalog.count) Item và thông tin Loại tương ứng."
+    }
     func resetToOriginal() { guard isLoaded else { return }; player = originalPlayer; persist(); infoMessage = "Đã đưa dữ liệu về trạng thái vừa giải mã." }
     func luckyRecords() -> [EditableRow] { (player["luckyCatRecords"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["talkId"]), subtitle: "Vật phẩm \(string(o["itemId"]))", values: [string(o["reward"])]) } }
     func saveLuckyRecords(_ rows: [EditableRow]) {
@@ -243,6 +284,7 @@ final class SaveEditorModel: ObservableObject {
         if let url = Bundle.main.url(forResource: "ItemCatalog", withExtension: "json"), let data = try? Data(contentsOf: url), let bundled = try? JSONDecoder().decode([String: String].self, from: data) { catalog = bundled }
         if let saved = UserDefaults.standard.dictionary(forKey: "luckyItemCatalog") as? [String: String] { catalog.merge(saved) { _, savedValue in savedValue } }
         itemCatalog = catalog
+        itemTypes = UserDefaults.standard.dictionary(forKey: "luckyItemTypes") as? [String: String] ?? [:]
     }
     private func persist() { do { try writeWorkspace() } catch { errorMessage = error.localizedDescription } }
     private func mutateArray(_ key: String, _ body: (inout JSONValue) -> Void) -> Int { guard var values = player[key]?.arrayValue else { return 0 }; for i in values.indices { body(&values[i]) }; player[key] = .array(values); return values.count }
@@ -279,7 +321,20 @@ struct BinaryPlistDocument: FileDocument { static var readableContentTypes: [UTT
 struct LuckyCatalogDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.json] }
     var catalog: [String: String]
-    init(catalog: [String: String]) { self.catalog = catalog }
-    init(configuration: ReadConfiguration) throws { let data = configuration.file.regularFileContents ?? Data(); catalog = try JSONDecoder().decode([String: String].self, from: data) }
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: try JSONEncoder().encode(catalog)) }
+    var types: [String: String]
+    init(catalog: [String: String], types: [String: String] = [:]) { self.catalog = catalog; self.types = types }
+    init(configuration: ReadConfiguration) throws {
+        let data = configuration.file.regularFileContents ?? Data()
+        if let payload = try? JSONDecoder().decode(LuckyCatalogPayload.self, from: data) {
+            catalog = payload.catalog
+            types = payload.types
+        } else {
+            catalog = try JSONDecoder().decode([String: String].self, from: data)
+            types = [:]
+        }
+    }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: try JSONEncoder().encode(LuckyCatalogPayload(catalog: catalog, types: types)))
+    }
 }
+struct LuckyCatalogPayload: Codable { var catalog: [String: String]; var types: [String: String] }
