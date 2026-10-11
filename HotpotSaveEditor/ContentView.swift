@@ -53,7 +53,12 @@ struct ContentView: View {
         .fileImporter(isPresented: $importing, allowedContentTypes: importTypes, allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { editor.importPlist(from: url) } }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .data, defaultFilename: "hotpot_repacked.bplist") { result in switch result { case .success: editor.finishExport(); case .failure(let error): editor.errorMessage = "Không thể xuất file: \(error.localizedDescription)" } }
         .fileExporter(isPresented: Binding(get: { catalogExport != nil }, set: { if !$0 { catalogExport = nil } }), document: catalogExport, contentType: .json, defaultFilename: "du-lieu-meo-than-tai.json") { _ in catalogExport = nil }
-        .fileImporter(isPresented: $importingCatalog, allowedContentTypes: [.json]) { result in if case .success(let urls) = result, let url = urls.first { do { let data = try Data(contentsOf: url); editor.importItemCatalog(try JSONDecoder().decode([String: String].self, from: data)) } catch { editor.errorMessage = "Không thể nhập dữ liệu Mèo Thần Tài: \(error.localizedDescription)" } } }
+        .fileImporter(isPresented: $importingCatalog, allowedContentTypes: [.json]) { result in
+            switch result {
+            case .success(let url): importLuckyCatalog(from: url)
+            case .failure(let error): editor.errorMessage = "Không thể chọn dữ liệu Mèo Thần Tài: \(error.localizedDescription)"
+            }
+        }
         .alert("Xóa dữ liệu giải mã?", isPresented: $askToClearNow) {
             Button("Hủy", role: .cancel) {}
             Button("Xóa", role: .destructive) { editor.clearWorkspace() }
@@ -66,6 +71,14 @@ struct ContentView: View {
     private var errorPresented: Binding<Bool> { Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } }) }
     private var infoPresented: Binding<Bool> { Binding(get: { editor.infoMessage != nil }, set: { if !$0 { editor.infoMessage = nil } }) }
     private func exportNow() { exportDocument = editor.prepareExport(); exporting = exportDocument != nil }
+    private func importLuckyCatalog(from url: URL) {
+        do {
+            let acquired = url.startAccessingSecurityScopedResource()
+            defer { if acquired { url.stopAccessingSecurityScopedResource() } }
+            let catalog = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: url))
+            editor.importItemCatalog(catalog)
+        } catch { editor.errorMessage = "Không thể nhập dữ liệu Mèo Thần Tài: \(error.localizedDescription)" }
+    }
     private var appTint: Color {
         switch editor.accentName {
         case "Đỏ": return .red
