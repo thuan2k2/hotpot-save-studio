@@ -9,7 +9,6 @@ struct ContentView: View {
     @State private var importing = false
     @State private var exporting = false
     @State private var exportDocument: BinaryPlistDocument?
-    @State private var askToClearAfterExport = false
     @State private var askToClearNow = false
     @State private var selectedTab: StudioTab = .home
     @State private var navigationPath = NavigationPath()
@@ -45,12 +44,11 @@ struct ContentView: View {
         // Expanding the root is what makes the scroll viewport and tab bar use
         // the complete iPhone window rather than a vertically centred section.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.ignoresSafeArea())
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .modifier(KeyboardDoneModifier())
         .preferredColorScheme(preferredScheme)
-        .environment(\.locale, Locale(identifier: editor.language == "en" ? "en" : "vi"))
-        .tint(appTint)
+        .tint(.orange)
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .data, defaultFilename: "hotpot_repacked.bplist") { result in switch result { case .success: editor.finishExport(); case .failure(let error): editor.errorMessage = "Không thể xuất file: \(error.localizedDescription)" } }
         .fileExporter(isPresented: Binding(get: { catalogExport != nil }, set: { if !$0 { catalogExport = nil } }), document: catalogExport, contentType: .json, defaultFilename: "du-lieu-meo-than-tai.json") { _ in catalogExport = nil }
         .fileImporter(isPresented: $importingCatalog, allowedContentTypes: [.json]) { result in
@@ -79,18 +77,6 @@ struct ContentView: View {
             editor.importItemCatalog(catalog)
         } catch { editor.errorMessage = "Không thể nhập dữ liệu Mèo Thần Tài: \(error.localizedDescription)" }
     }
-    private var appTint: Color {
-        switch editor.accentName {
-        case "Đỏ": return .red
-        case "Cam": return .orange
-        case "Vàng": return .yellow
-        case "Lục": return .green
-        case "Lam": return .blue
-        case "Chàm": return .indigo
-        case "Tím": return .purple
-        default: return .accentColor
-        }
-    }
     private var preferredScheme: ColorScheme? {
         switch editor.appearance { case "Sáng": return .light; case "Tối": return .dark; default: return nil }
     }
@@ -101,20 +87,20 @@ struct ContentView: View {
                 StudioPageHeader("Trang chủ", askToClear: $askToClearNow, showsSettings: false)
                 StudioSectionTitle("Dữ liệu save")
                 StudioCard {
-                    Button { importing = true } label: { StudioRow(icon: "folder", title: editor.isLoaded ? editor.importedFileName : "Chọn file PLIST", detail: editor.isLoaded ? "Đã sẵn sàng chỉnh sửa" : "Chọn com.lxqd.hotpotiver.plist từ Files", tint: editor.isLoaded ? .green : .studioAccent) }.buttonStyle(.plain)
+                    Button { importing = true } label: { StudioRow(icon: "folder", title: editor.isLoaded ? editor.importedFileName : "Chọn file PLIST", detail: editor.isLoaded ? "Đã sẵn sàng chỉnh sửa" : "Chọn com.lxqd.hotpotiver.plist từ Files", tint: editor.isLoaded ? .green : .orange) }.buttonStyle(.plain)
                 }
                 StudioSectionTitle("Thao tác")
                 StudioCard {
                     if editor.isLoaded {
-                        Button(action: exportNow) { StudioRow(icon: "arrow.up.doc", title: "Đóng gói và xuất", detail: "Tạo hotpot_repacked.bplist và tự xóa dữ liệu đã giải mã", tint: .studioAccent) }.buttonStyle(.plain)
-                        Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 60)
+                        Button(action: exportNow) { StudioRow(icon: "arrow.up.doc", title: "Đóng gói và xuất", detail: "Tạo hotpot_repacked.bplist và tự xóa dữ liệu đã giải mã", tint: .orange) }.buttonStyle(.plain)
+                        Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 60)
                     }
                     StudioRow(icon: editor.hasWorkspace ? "checkmark.circle.fill" : "circle", title: "Dữ liệu giải mã", detail: editor.hasWorkspace ? "Đang được lưu trong ứng dụng" : "Chưa có dữ liệu giải mã", tint: editor.hasWorkspace ? .green : .secondary, showsChevron: false)
                 }
                 Text("Ứng dụng chỉ xử lý file bạn tự chọn trong Files. File gốc không bị ghi đè.").font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 4)
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 96)
         }
-        .background(Color.black)
+        .background(Color(uiColor: .systemBackground))
         .toolbar(.hidden, for: .navigationBar)
         .fileImporter(isPresented: $importing, allowedContentTypes: importTypes, allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first { editor.importPlist(from: url) }
@@ -131,7 +117,7 @@ struct ContentView: View {
                 StudioSectionTitle("Nội dung game")
                 StudioCard { StudioLinks([("cat", "Mèo Thần Tài", "Phần thưởng và lịch sử tương tác", AnyView(LuckyCatView())), ("gamecontroller", "Sự kiện & trò chơi nhỏ", "Điểm và tiền tệ sự kiện", AnyView(MinigameView())), ("storefront", "Cửa hàng & VIP", "Điểm VIP, thẻ tháng và tiền tệ cửa hàng", AnyView(ShopVIPView())), ("ticket", "Thẻ mùa giải", "Xu đào lỗ, cấp độ và thử thách", AnyView(GatePassView())), ("gift", "Quà sự kiện", "Đánh dấu nhận các phần thưởng hiện có", AnyView(EventRewardsView()))]) }
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 96)
-        }.background(Color.black).toolbar(.hidden, for: .navigationBar)
+        }.background(Color(uiColor: .systemBackground)).toolbar(.hidden, for: .navigationBar)
     }
 }
 
@@ -148,28 +134,28 @@ private struct QuickEditView: View {
                     StudioCard {
                         ForEach(editor.quickFields.indices, id: \.self) { index in
                             QuickValueRow(field: editor.quickFields[index])
-                            if index < editor.quickFields.count - 1 { Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 16) }
+                            if index < editor.quickFields.count - 1 { Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16) }
                         }
                     }
                 }
                 Text("Mở khóa siêu tốc").font(.title3.weight(.bold)).padding(.top, 6)
-                StudioCard { VStack(spacing: 0) { ActionButton("Mở khóa toàn bộ món ăn", icon: "fork.knife") { editor.runMassAction("foods") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa cơ sở vật chất", icon: "chair") { editor.runMassAction("facilities") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa khu vực & phòng", icon: "door.left.hand.open") { editor.runMassAction("areas") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Tối đa thân thiết khách hàng", icon: "heart") { editor.runMassAction("favor") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Mở khóa nhân viên", icon: "person.3") { editor.runMassAction("staff") }; Divider().overlay(Color.white.opacity(0.14)); ActionButton("Hoàn thành toàn bộ nhiệm vụ", icon: "checkmark.seal") { editor.runMassAction("tasks") } } }
+                StudioCard { VStack(spacing: 0) { ActionButton("Mở khóa toàn bộ món ăn", icon: "fork.knife") { editor.runMassAction("foods") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa cơ sở vật chất", icon: "chair") { editor.runMassAction("facilities") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa khu vực & phòng", icon: "door.left.hand.open") { editor.runMassAction("areas") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Tối đa thân thiết khách hàng", icon: "heart") { editor.runMassAction("favor") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Mở khóa nhân viên", icon: "person.3") { editor.runMassAction("staff") }; Divider().overlay(Color.primary.opacity(0.14)); ActionButton("Hoàn thành toàn bộ nhiệm vụ", icon: "checkmark.seal") { editor.runMassAction("tasks") } } }
                 HStack(spacing: 10) {
-                    Button("Lưu các chỉnh sửa") { editor.infoMessage = "Đã lưu các chỉnh sửa trong vùng làm việc." }.buttonStyle(.bordered).tint(Color.studioAccent)
-                    Button("Đóng gói và xuất", action: onExport).buttonStyle(.borderedProminent).tint(Color.studioAccent)
+                    Button("Lưu các chỉnh sửa") { editor.infoMessage = "Đã lưu các chỉnh sửa trong vùng làm việc." }.buttonStyle(.bordered).tint(.orange)
+                    Button("Đóng gói và xuất", action: onExport).buttonStyle(.borderedProminent).tint(.orange)
                 }.frame(maxWidth: .infinity)
                 Button("Đưa về gốc", role: .destructive) { editor.resetToOriginal() }.frame(maxWidth: .infinity).buttonStyle(.bordered)
             // The persistent tab pill occupies part of the lower safe area.
             // Leave room after the final row so it can always be scrolled into view.
             }.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 112)
-        }.background(Color.black).navigationTitle("Chỉnh nhanh").navigationBarTitleDisplayMode(.inline)
+        }.background(Color(uiColor: .systemBackground)).navigationTitle("Chỉnh nhanh").navigationBarTitleDisplayMode(.inline)
     }
 }
 
 private struct AdvancedView: View {
     @EnvironmentObject var editor: SaveEditorModel
     @State private var adCount = ""; @State private var eventScore = ""; @State private var passScore = ""; @State private var nextReward = Date(); @State private var freeUntil = Date()
-    var body: some View { Form { Section("Thẻ tháng") { Button("Gia hạn thẻ tháng (+30 ngày)") { editor.extendCard(superCard: false) }.tint(Color.studioAccent) } }.navigationTitle("VIP & thẻ tháng") }
+    var body: some View { Form { Section("Thẻ tháng") { Button("Gia hạn thẻ tháng (+30 ngày)") { editor.extendCard(superCard: false) }.tint(.orange) } }.navigationTitle("VIP & thẻ tháng") }
 }
 
 private struct ManualEditorView: View {
@@ -195,8 +181,8 @@ private struct SettingsHomeView: View {
     @Binding var importingCatalog: Bool
     var body: some View {
         Form {
-            Section("Ứng dụng") { HStack { Image(systemName: "app.fill").font(.title).foregroundStyle(Color.studioAccent).frame(width: 48, height: 48).background(Color.studioAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: 11)); VStack(alignment: .leading) { Text("Hotpot Save Studio").font(.headline); Text("Phiên bản 1.0").foregroundStyle(.secondary) } } }
-            Section("Giao diện") { Picker("Ngôn ngữ", selection: $editor.language) { Text("Tiếng Việt").tag("vi"); Text("English").tag("en") }; Picker("Màu UI", selection: $editor.accentName) { ForEach(["Hệ thống", "Đỏ", "Cam", "Vàng", "Lục", "Lam", "Chàm", "Tím"], id: \.self) { Text($0) } }; Picker("Chế độ", selection: $editor.appearance) { Text("Hệ thống").tag("Hệ thống"); Text("Sáng").tag("Sáng"); Text("Tối").tag("Tối") } }
+            Section("Ứng dụng") { HStack { Image(systemName: "app.fill").font(.title).foregroundStyle(.orange).frame(width: 48, height: 48).background(Color.orange.opacity(0.16), in: RoundedRectangle(cornerRadius: 11)); VStack(alignment: .leading) { Text("Hotpot Save Studio").font(.headline); Text("Phiên bản 1.0").foregroundStyle(.secondary) } } }
+            Section("Giao diện") { Picker("Chế độ", selection: $editor.appearance) { Text("Hệ thống").tag("Hệ thống"); Text("Sáng").tag("Sáng"); Text("Tối").tag("Tối") } }
             Section("Dữ liệu Mèo Thần Tài") { Button("Xuất dữ liệu Mèo thần tài") { catalogExport = LuckyCatalogDocument(catalog: editor.itemCatalog) }; Button("Nhập dữ liệu Mèo thần tài") { importingCatalog = true } }
             Section("Dữ liệu ứng dụng") { Button("Xóa dữ liệu đã giải mã", role: .destructive) { askToClear = true } }
             Section("Hướng dẫn") { Text("Chọn file tại Trang chủ, chỉnh sửa tại các tab, sau đó đóng gói và xuất file mới. File gốc trong Files không bị ghi đè.").font(.footnote) }
@@ -214,7 +200,7 @@ private struct QuickValueRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(field.title).font(.subheadline.weight(.medium)).foregroundStyle(.white).lineLimit(2)
+                Text(field.title).font(.subheadline.weight(.medium)).foregroundStyle(.primary).lineLimit(2)
                 Text("(\(field.detail))").font(.caption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
             TextField("0", text: Binding(get: { editor.value(for: field.key) }, set: { editor.updateValue($0, key: field.key) }))
@@ -224,14 +210,14 @@ private struct QuickValueRow: View {
                 .frame(width: 122)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 9)
-                .background(Color.black.opacity(0.35), in: .rect(cornerRadius: 10))
+                .background(Color.primary.opacity(0.10), in: .rect(cornerRadius: 10))
         }.padding(.horizontal, 16).padding(.vertical, 9)
     }
 }
 private struct EditableRowsView: View { @Binding var rows: [EditableRow]; let labels: [String]; let empty: String; let save: () -> Void; var body: some View { Group { if rows.isEmpty { ContentUnavailableView(empty, systemImage: "tray") } else { List { ForEach($rows) { $row in EditableRowCard(row: $row, labels: labels) }; Section { Button("Lưu thay đổi", action: save).frame(maxWidth: .infinity).buttonStyle(.borderedProminent).tint(.orange) } } } } } }
 private struct EditableRowCard: View { @Binding var row: EditableRow; let labels: [String]; var body: some View { VStack(alignment: .leading, spacing: 8) { Text(row.identifier.isEmpty ? "Không có ID" : row.identifier).font(.headline); Text(row.subtitle).font(.caption).foregroundStyle(.secondary); ForEach(labels.indices, id: \.self) { index in TextField(labels[index], text: Binding(get: { row.values.indices.contains(index) ? row.values[index] : "" }, set: { value in while row.values.count <= index { row.values.append("") }; row.values[index] = value })).textFieldStyle(.roundedBorder).keyboardType(.numbersAndPunctuation) } }.padding(.vertical, 4) } }
 private struct MenuRow: View { let icon: String; let title: String; let detail: String; var body: some View { Label { VStack(alignment: .leading, spacing: 2) { Text(title).font(.body); Text(detail).font(.caption).foregroundStyle(.secondary) } } icon: { Image(systemName: icon).font(.body).foregroundStyle(.orange) } } }
-private struct ActionButton: View { let title: String; let icon: String; var tint: Color = .studioAccent; let action: () -> Void; init(_ title: String, icon: String, tint: Color = .studioAccent, action: @escaping () -> Void) { self.title = title; self.icon = icon; self.tint = tint; self.action = action }; var body: some View { Button(action: action) { Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 13) }.tint(tint).buttonStyle(.plain) } }
+private struct ActionButton: View { let title: String; let icon: String; var tint: Color = .orange; let action: () -> Void; init(_ title: String, icon: String, tint: Color = .orange, action: @escaping () -> Void) { self.title = title; self.icon = icon; self.tint = tint; self.action = action }; var body: some View { Button(action: action) { Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 13) }.tint(tint).buttonStyle(.plain) } }
 private struct MissingDataView: View { var body: some View { ContentUnavailableView("Chưa có dữ liệu", systemImage: "doc", description: Text("Hãy nhập PLIST ở tab Tệp.")) } }
 private struct GlassCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { VStack(alignment: .leading, spacing: 6) { content }.frame(maxWidth: .infinity, alignment: .leading).padding(14).background(.thinMaterial, in: .rect(cornerRadius: 18)) } }
 
@@ -249,7 +235,7 @@ private struct KeyboardDoneModifier: ViewModifier {
 private struct StudioSectionTitle: View {
     let title: String
     init(_ title: String) { self.title = title }
-    var body: some View { Text(title).font(.headline.weight(.bold)).foregroundStyle(.white).padding(.horizontal, 2) }
+    var body: some View { Text(title).font(.headline.weight(.bold)).foregroundStyle(.primary).padding(.horizontal, 2) }
 }
 
 /// A compact in-content header for the three root tabs.  Keeping this inside
@@ -270,7 +256,7 @@ private struct StudioPageHeader: View {
         HStack(spacing: 10) {
             Text(title)
                 .font(.title3.weight(.bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
 
             Spacer(minLength: 12)
 
@@ -279,7 +265,7 @@ private struct StudioPageHeader: View {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 34, height: 34)
-                        .background(Color.white.opacity(0.10), in: Circle())
+                        .background(Color.primary.opacity(0.10), in: Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -290,16 +276,16 @@ private struct StudioPageHeader: View {
 
 private struct StudioCard<Content: View>: View {
     @ViewBuilder var content: Content
-    var body: some View { VStack(spacing: 0) { content }.background(Color.white.opacity(0.12), in: .rect(cornerRadius: 20)).overlay { RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.06), lineWidth: 1) } }
+    var body: some View { VStack(spacing: 0) { content }.background(Color.primary.opacity(0.08), in: .rect(cornerRadius: 20)).overlay { RoundedRectangle(cornerRadius: 20).stroke(Color.primary.opacity(0.10), lineWidth: 1) } }
 }
 
 private struct StudioRow: View {
-    let icon: String; let title: String; let detail: String; var tint: Color = .studioAccent; var showsChevron = true
+    let icon: String; let title: String; let detail: String; var tint: Color = .orange; var showsChevron = true
     @ScaledMetric(relativeTo: .body) private var verticalPadding: CGFloat = 10
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(.system(size: 17, weight: .medium)).foregroundStyle(tint).frame(width: 36, height: 36).background(tint.opacity(0.16), in: .rect(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 2) { Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.white).lineLimit(1); Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+            VStack(alignment: .leading, spacing: 2) { Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(1); Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             Spacer(minLength: 6)
             if showsChevron { Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary) }
         }.padding(.horizontal, 13).padding(.vertical, verticalPadding).contentShape(.rect)
@@ -313,7 +299,7 @@ private struct StudioLinks: View {
         VStack(spacing: 0) {
             ForEach(entries.indices, id: \.self) { index in
                 NavigationLink { entries[index].3 } label: { StudioRow(icon: entries[index].0, title: entries[index].1, detail: entries[index].2) }.buttonStyle(.plain)
-                if index < entries.count - 1 { Divider().overlay(Color.white.opacity(0.14)).padding(.leading, 61) }
+                if index < entries.count - 1 { Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 61) }
             }
         }
     }
@@ -322,7 +308,7 @@ private struct StudioLinks: View {
 private struct StudioNotice: View {
     let text: String
     init(_ text: String) { self.text = text }
-    var body: some View { Text(text).font(.subheadline).foregroundStyle(.secondary).padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Color.white.opacity(0.08), in: .rect(cornerRadius: 18)) }
+    var body: some View { Text(text).font(.subheadline).foregroundStyle(.secondary).padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Color.primary.opacity(0.07), in: .rect(cornerRadius: 18)) }
 }
 
 private struct StudioTabBar: View {
@@ -333,26 +319,11 @@ private struct StudioTabBar: View {
             StudioTabButton(tab: .quick, title: "Sửa nhanh", icon: "bolt.fill", selection: $selection)
             StudioTabButton(tab: .editor, title: "Chỉnh sửa", icon: "slider.horizontal.3", selection: $selection)
             StudioTabButton(tab: .settings, title: "Cài đặt", icon: "gearshape.fill", selection: $selection)
-        }.padding(4).glassEffect(.regular, in: Capsule()).overlay { Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1) }
+        }.padding(4).glassEffect(.regular, in: Capsule()).overlay { Capsule().stroke(Color.primary.opacity(0.16), lineWidth: 1) }
     }
 }
 
 private struct StudioTabButton: View {
     let tab: StudioTab; let title: String; let icon: String; @Binding var selection: StudioTab
-    var body: some View { Button { selection = tab } label: { VStack(spacing: 2) { Image(systemName: icon).font(.subheadline.weight(.medium)); Text(title).font(.caption2.weight(.medium)) }.foregroundStyle(selection == tab ? Color.studioAccent : Color.white).frame(maxWidth: .infinity).padding(.vertical, 6).background(selection == tab ? Color.studioAccent.opacity(0.18) : .clear, in: Capsule()) }.buttonStyle(.plain).contentShape(Capsule()).animation(.snappy(duration: 0.24), value: selection) }
-}
-
-private extension Color {
-    static var studioAccent: Color {
-        switch UserDefaults.standard.string(forKey: "studioAccent") ?? "Hệ thống" {
-        case "Đỏ": return .red
-        case "Cam": return .orange
-        case "Vàng": return .yellow
-        case "Lục": return .green
-        case "Lam": return .blue
-        case "Chàm": return .indigo
-        case "Tím": return .purple
-        default: return .accentColor
-        }
-    }
+    var body: some View { Button { selection = tab } label: { VStack(spacing: 2) { Image(systemName: icon).font(.subheadline.weight(.medium)); Text(title).font(.caption2.weight(.medium)) }.foregroundStyle(selection == tab ? Color.orange : Color.primary).frame(maxWidth: .infinity).padding(.vertical, 6).background(selection == tab ? Color.orange.opacity(0.18) : .clear, in: Capsule()) }.buttonStyle(.plain).contentShape(Capsule()).animation(.snappy(duration: 0.24), value: selection) }
 }
