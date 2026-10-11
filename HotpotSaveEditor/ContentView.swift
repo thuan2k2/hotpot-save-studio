@@ -49,7 +49,7 @@ struct ContentView: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .modifier(KeyboardDoneModifier())
         .preferredColorScheme(.dark)
-        .tint(.orange)
+        .tint(appTint)
         .fileImporter(isPresented: $importing, allowedContentTypes: importTypes, allowsMultipleSelection: false) { result in if case .success(let urls) = result, let url = urls.first { editor.importPlist(from: url) } }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .data, defaultFilename: "hotpot_repacked.bplist") { result in switch result { case .success: editor.finishExport(); case .failure(let error): editor.errorMessage = "Không thể xuất file: \(error.localizedDescription)" } }
         .fileExporter(isPresented: Binding(get: { catalogExport != nil }, set: { if !$0 { catalogExport = nil } }), document: catalogExport, contentType: .json, defaultFilename: "du-lieu-meo-than-tai.json") { _ in catalogExport = nil }
@@ -61,6 +61,18 @@ struct ContentView: View {
 
     private var tabBinding: Binding<StudioTab> { Binding(get: { selectedTab }, set: { newTab in navigationPath = NavigationPath(); selectedTab = newTab }) }
     private func exportNow() { exportDocument = editor.prepareExport(); exporting = exportDocument != nil }
+    private var appTint: Color {
+        switch editor.accentName {
+        case "Đỏ": return .red
+        case "Cam": return .orange
+        case "Vàng": return .yellow
+        case "Lục": return .green
+        case "Lam": return .blue
+        case "Chàm": return .indigo
+        case "Tím": return .purple
+        default: return .accentColor
+        }
+    }
 
     private var fileView: some View {
         ScrollView {
