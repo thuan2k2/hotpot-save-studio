@@ -35,6 +35,10 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            // NavigationLink(destination:) keeps its own presentation state.
+            // Recreate the stack when selecting a root tab so a destination
+            // such as "VIP & thẻ tháng" cannot remain above the new tab.
+            .id(selectedTab)
 
             StudioTabBar(selection: tabBinding)
                 .padding(.horizontal, 16)
@@ -65,7 +69,7 @@ struct ContentView: View {
         .alert("Hoàn tất", isPresented: infoPresented) { Button("OK", role: .cancel) {} } message: { Text(editor.infoMessage ?? "") }
     }
 
-    private var tabBinding: Binding<StudioTab> { Binding(get: { selectedTab }, set: { newTab in withAnimation(.snappy(duration: 0.28, extraBounce: 0.08)) { navigationPath = NavigationPath(); selectedTab = newTab } }) }
+    private var tabBinding: Binding<StudioTab> { Binding(get: { selectedTab }, set: { newTab in guard newTab != selectedTab else { return }; navigationPath = NavigationPath(); withAnimation(.snappy(duration: 0.28, extraBounce: 0.08)) { selectedTab = newTab } }) }
     private var errorPresented: Binding<Bool> { Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } }) }
     private var infoPresented: Binding<Bool> { Binding(get: { editor.infoMessage != nil }, set: { if !$0 { editor.infoMessage = nil } }) }
     private func exportNow() { exportDocument = editor.prepareExport(); exporting = exportDocument != nil }
@@ -167,7 +171,49 @@ private struct ManualEditorView: View {
 private struct LimitEditorView: View { @EnvironmentObject var editor: SaveEditorModel; @State private var rows: [EditableRow] = []; var body: some View { EditableRowsView(rows: $rows, labels: ["Giá trị (đặt 0 để đặt lại)"], empty: "Không tìm thấy dữ liệu lượt mua, giới hạn hoặc thời gian chờ.") { editor.saveLimitRows(rows) }.navigationTitle("Lượt & giới hạn").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Lưu") { editor.saveLimitRows(rows) } } }.onAppear { rows = editor.limitRows() } } }
 private struct FusionView: View { @EnvironmentObject var editor: SaveEditorModel; @State private var rows: [EditableRow] = []; @State private var selected = "fusionElementBalls"; var body: some View { VStack { Picker("Dữ liệu", selection: $selected) { Text("Bóng nguyên tố").tag("fusionElementBalls"); Text("Kho ghép đồ").tag("fusionStockItems") }.pickerStyle(.segmented).padding(); Form { Section("Trạng thái") { Toggle("Mở panel ghép đồ", isOn: Binding(get: { editor.boolValue("openFusionPanelFlag") }, set: { editor.setBool("openFusionPanelFlag", $0) })); Toggle("Đồng bộ bàn cờ cũ", isOn: Binding(get: { editor.boolValue("legacyFusionBoardMigrated") }, set: { editor.setBool("legacyFusionBoardMigrated", $0) })); Toggle("Đồng bộ quà Mèo cũ", isOn: Binding(get: { editor.boolValue("legacyFusionLuckyCatRewardsMigrated") }, set: { editor.setBool("legacyFusionLuckyCatRewardsMigrated", $0) })); TextField("Rương vàng", text: Binding(get: { editor.value(for: "fusionGoldChestNum") }, set: { editor.updateValue($0, key: "fusionGoldChestNum") })).keyboardType(.numbersAndPunctuation) } }; EditableRowsView(rows: $rows, labels: ["Số lượng"], empty: "Không có dữ liệu.") { editor.saveFusionRows(rows) }.onAppear { rows = editor.fusionRows(selected) }.onChange(of: selected) { _, value in rows = editor.fusionRows(value) } }.navigationTitle("Ghép đồ") } }
 private struct TasksView: View { @EnvironmentObject var editor: SaveEditorModel; @State private var area: TaskArea = .normal; @State private var rows: [EditableRow] = []; var body: some View { VStack { Picker("Nhóm", selection: $area) { ForEach(TaskArea.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented).padding(); Form { Section("Tiến độ chính") { TextField("Chỉ mục nhiệm vụ hiện tại", text: Binding(get: { editor.value(for: "taskCurrentIndex") }, set: { editor.updateValue($0, key: "taskCurrentIndex") })).keyboardType(.numbersAndPunctuation); Button("Hoàn thành tất cả") { editor.maxTasks(area); rows = editor.taskRows(area) }.buttonStyle(.borderedProminent).tint(.orange) } }; EditableRowsView(rows: $rows, labels: ["Đã hoàn thành", "Mục tiêu"], empty: "Không có nhiệm vụ.") { editor.saveTaskRows(rows, area: area) }.onAppear { rows = editor.taskRows(area) }.onChange(of: area) { _, value in rows = editor.taskRows(value) } }.navigationTitle("Nhiệm vụ") } }
-private struct LuckyCatView: View { @EnvironmentObject var editor: SaveEditorModel; @State private var rows: [EditableRow] = []; var body: some View { List { ForEach($rows) { $row in LuckyRewardCard(row: $row) } }.navigationTitle("Mèo Thần Tài").toolbar { ToolbarItem(placement: .topBarLeading) { Button { editor.addLuckyReward(); rows = editor.luckyRewards() } label: { Image(systemName: "plus") } }; ToolbarItem(placement: .topBarTrailing) { Button("Lưu") { editor.saveLuckyRewards(rows) } } }.onAppear { rows = editor.luckyRewards() } } }
+private struct LuckyCatView: View {
+    @EnvironmentObject var editor: SaveEditorModel
+    @State private var rows: [EditableRow] = []
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Phần thưởng Mèo Thần Tài").font(.title3.weight(.bold))
+                Text("Mỗi phần thưởng gồm Loại, ID vật phẩm, Tên vật phẩm và Số lượng.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if !editor.isLoaded {
+                    MissingDataView()
+                } else if rows.isEmpty {
+                    StudioNotice("Chưa có phần thưởng. Nhấn dấu + để thêm một trường mới.")
+                } else {
+                    ForEach($rows) { $row in
+                        LuckyRewardCard(row: $row)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .padding(.bottom, 24)
+        }
+        .background(Color(uiColor: .systemBackground))
+        .navigationTitle("Mèo Thần Tài")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { editor.addLuckyReward(); rows = editor.luckyRewards() } label: {
+                    Image(systemName: "plus")
+                }
+                .disabled(!editor.isLoaded)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Lưu") { editor.saveLuckyRewards(rows) }
+                    .disabled(!editor.isLoaded)
+            }
+        }
+        .onAppear { rows = editor.luckyRewards() }
+    }
+}
 private struct MinigameView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Điểm & tiền tệ") { ForEach(editor.minigameFields) { DetailedValueField(field: $0) } } }.navigationTitle("Sự kiện & trò chơi nhỏ").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Lưu") { editor.infoMessage = "Đã lưu dữ liệu sự kiện và trò chơi nhỏ." } } } } }
 private struct ShopVIPView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Đặc quyền VIP & thẻ tháng") { ForEach(editor.shopFields.prefix(1)) { DetailedValueField(field: $0) }; DatePicker("Hạn thẻ tháng thường", selection: Binding(get: { editor.cardEndDate(superCard: false) }, set: { editor.setCardEndDate($0, superCard: false) })); DatePicker("Hạn thẻ tháng cao cấp", selection: Binding(get: { editor.cardEndDate(superCard: true) }, set: { editor.setCardEndDate($0, superCard: true) })) }; Section("Tiền tệ cửa hàng đặc biệt") { ForEach(editor.shopFields.dropFirst()) { DetailedValueField(field: $0) } } }.navigationTitle("Cửa hàng & VIP").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Lưu") { editor.infoMessage = "Đã lưu dữ liệu cửa hàng và VIP." } } } } }
 private struct GatePassView: View { @EnvironmentObject var editor: SaveEditorModel; var body: some View { Form { Section("Thẻ mùa giải") { TextField("Xu đào lỗ", text: Binding(get: { editor.value(for: "holeCoins") }, set: { editor.updateValue($0, key: "holeCoins") })).keyboardType(.numbersAndPunctuation); Button("Tối đa cấp độ & qua ải mọi mùa") { editor.maxGatePass() }.buttonStyle(.borderedProminent).tint(.orange); Text("Đặt 100.000 điểm, hoàn thành nhiệm vụ và thử thách của mọi thẻ mùa giải hiện có.").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("Thẻ mùa giải") } }
@@ -193,7 +239,72 @@ private struct SettingsHomeView: View {
 
 private struct ValueField: View { @EnvironmentObject var editor: SaveEditorModel; let field: EditField; var body: some View { TextField(field.title, text: Binding(get: { editor.value(for: field.key) }, set: { editor.updateValue($0, key: field.key) })).keyboardType(.numbersAndPunctuation) } }
 private struct DetailedValueField: View { @EnvironmentObject var editor: SaveEditorModel; let field: EditField; var body: some View { VStack(alignment: .leading, spacing: 3) { Text(field.title).font(.subheadline.weight(.medium)); Text(field.detail).font(.caption).foregroundStyle(.secondary); TextField("0", text: Binding(get: { editor.value(for: field.key) }, set: { editor.updateValue($0, key: field.key) })).keyboardType(.numbersAndPunctuation) } } }
-private struct LuckyRewardCard: View { @EnvironmentObject var editor: SaveEditorModel; @Binding var row: EditableRow; var body: some View { VStack(alignment: .leading, spacing: 7) { TextField("Loại (Type)", text: $row.subtitle).keyboardType(.numbersAndPunctuation); TextField("ID vật phẩm", text: $row.identifier).keyboardType(.numbersAndPunctuation).onChange(of: row.identifier) { _, id in if row.values.count > 1 { row.values[1] = editor.itemName(for: id) } }; TextField("Tên vật phẩm", text: Binding(get: { row.values.count > 1 ? row.values[1] : "" }, set: { value in while row.values.count < 2 { row.values.append("") }; row.values[1] = value })); TextField("Số lượng", text: Binding(get: { row.values.first ?? "0" }, set: { value in if row.values.isEmpty { row.values = [value] } else { row.values[0] = value } })).keyboardType(.numbersAndPunctuation) } } }
+private struct LuckyRewardCard: View {
+    @EnvironmentObject var editor: SaveEditorModel
+    @Binding var row: EditableRow
+
+    private var itemName: Binding<String> {
+        Binding(
+            get: { row.values.count > 1 ? row.values[1] : "" },
+            set: { value in
+                while row.values.count < 2 { row.values.append("") }
+                row.values[1] = value
+            }
+        )
+    }
+
+    private var quantity: Binding<String> {
+        Binding(
+            get: { row.values.first ?? "0" },
+            set: { value in
+                if row.values.isEmpty { row.values = [value] } else { row.values[0] = value }
+            }
+        )
+    }
+
+    var body: some View {
+        StudioCard {
+            VStack(spacing: 0) {
+                LuckyRewardValueRow(title: "Loại", detail: "Mã loại phần thưởng", value: $row.subtitle, numeric: true)
+                Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
+                LuckyRewardValueRow(title: "ID vật phẩm", detail: "Mã định danh vật phẩm", value: $row.identifier, numeric: true)
+                    .onChange(of: row.identifier) { _, id in itemName.wrappedValue = editor.itemName(for: id) }
+                Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
+                LuckyRewardValueRow(title: "Tên vật phẩm", detail: "Tự điền từ danh mục; có thể sửa", value: itemName)
+                Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
+                LuckyRewardValueRow(title: "Số lượng", detail: "Số vật phẩm nhận được", value: quantity, numeric: true)
+            }
+        }
+    }
+}
+
+private struct LuckyRewardValueRow: View {
+    let title: String
+    let detail: String
+    @Binding var value: String
+    var numeric = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+                Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            TextField("0", text: $value)
+                .keyboardType(numeric ? .numbersAndPunctuation : .default)
+                .multilineTextAlignment(.trailing)
+                .font(.subheadline.monospacedDigit())
+                .frame(width: 122)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(Color.primary.opacity(0.10), in: .rect(cornerRadius: 10))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
+    }
+}
 private struct QuickValueRow: View {
     @EnvironmentObject var editor: SaveEditorModel
     let field: EditField
