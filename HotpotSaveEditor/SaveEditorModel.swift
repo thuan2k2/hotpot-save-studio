@@ -41,13 +41,14 @@ final class SaveEditorModel: ObservableObject {
     @Published var showAdFreeTool = false
     @Published var language = "vi" { didSet { UserDefaults.standard.set(language, forKey: "studioLanguage") } }
     @Published var accentName = "Hệ thống" { didSet { UserDefaults.standard.set(accentName, forKey: "studioAccent") } }
+    @Published var appearance = "Hệ thống" { didSet { UserDefaults.standard.set(appearance, forKey: "studioAppearance") } }
     @Published private(set) var itemCatalog: [String: String] = [:]
     private var sourcePlist: [String: Any] = [:]
     private var player: JSONValue = .object([:])
     private var backup: JSONValue = .object([:])
     private var originalPlayer: JSONValue = .object([:])
 
-    init() { language = UserDefaults.standard.string(forKey: "studioLanguage") ?? "vi"; accentName = UserDefaults.standard.string(forKey: "studioAccent") ?? "Hệ thống"; loadItemCatalog() }
+    init() { language = UserDefaults.standard.string(forKey: "studioLanguage") ?? "vi"; accentName = UserDefaults.standard.string(forKey: "studioAccent") ?? "Hệ thống"; appearance = UserDefaults.standard.string(forKey: "studioAppearance") ?? "Hệ thống"; loadItemCatalog() }
 
     let quickFields: [EditField] = [
         .init(key: "gold", title: "Tiền vàng", detail: "Gold"), .init(key: "diamond", title: "Kim cương", detail: "Diamond"), .init(key: "actionPoint", title: "Thể lực", detail: "Action Point"), .init(key: "integral", title: "Điểm sự kiện", detail: "Integral"), .init(key: "staffTrainPoint", title: "Sổ đào tạo", detail: "Staff Train"), .init(key: "foodLimitCutPoint", title: "Bánh quy", detail: "Food Limit Cut"), .init(key: "playerLevel", title: "Cấp độ cửa hàng", detail: "Level"), .init(key: "playerExp", title: "Điểm kinh nghiệm", detail: "Player Exp"), .init(key: "starLevel", title: "Cấp sao", detail: "Star Level"), .init(key: "facilityScore", title: "Tổng điểm cơ sở", detail: "Facility Score"), .init(key: "serverScore", title: "Tổng điểm phục vụ", detail: "Service Score"), .init(key: "foodScore", title: "Tổng điểm thức ăn", detail: "Food Score"), .init(key: "vipPoint", title: "Điểm VIP", detail: "Vip Point"), .init(key: "capsuleToysCoin", title: "Xu gắp thú", detail: "Capsule Toys"), .init(key: "shopSkinCoin", title: "Xu thời trang", detail: "Skin Coin"), .init(key: "crawFishCoin", title: "Xu tôm hùm", detail: "Crawfish Coin"), .init(key: "fireflyCoin", title: "Xu đom đóm", detail: "Firefly Coin")]
