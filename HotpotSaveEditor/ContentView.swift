@@ -7,8 +7,7 @@ private enum StudioTab: Hashable { case home, quick, editor, settings }
 struct ContentView: View {
     @EnvironmentObject private var editor: SaveEditorModel
     @State private var importing = false
-    @State private var exporting = false
-    @State private var exportDocument: BinaryPlistDocument?
+    @State private var exportFileURL: URL?
     @State private var askToClearNow = false
     @State private var selectedTab: StudioTab = .home
     @State private var navigationPath = NavigationPath()
@@ -53,7 +52,18 @@ struct ContentView: View {
         .modifier(KeyboardDoneModifier())
         .preferredColorScheme(preferredScheme)
         .tint(.orange)
-        .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .data, defaultFilename: "hotpot_repacked.bplist") { result in switch result { case .success: editor.finishExport(); case .failure(let error): editor.errorMessage = "Không thể xuất file: \(error.localizedDescription)" } }
+        .sheet(isPresented: exportPickerPresented) {
+            if let url = exportFileURL {
+                SystemFileExportPicker(fileURL: url) { didExport in
+                    defer {
+                        try? FileManager.default.removeItem(at: url)
+                        exportFileURL = nil
+                    }
+                    if didExport { editor.finishExport() }
+                }
+                .ignoresSafeArea()
+            }
+        }
         .fileExporter(isPresented: Binding(get: { catalogExport != nil }, set: { if !$0 { catalogExport = nil } }), document: catalogExport, contentType: .json, defaultFilename: "du-lieu-meo-than-tai.json") { _ in catalogExport = nil }
         .fileImporter(isPresented: $importingCatalog, allowedContentTypes: [.json]) { result in
             switch result {
@@ -72,13 +82,21 @@ struct ContentView: View {
     private var tabBinding: Binding<StudioTab> { Binding(get: { selectedTab }, set: { newTab in guard newTab != selectedTab else { return }; navigationPath = NavigationPath(); withAnimation(.snappy(duration: 0.28, extraBounce: 0.08)) { selectedTab = newTab } }) }
     private var errorPresented: Binding<Bool> { Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } }) }
     private var infoPresented: Binding<Bool> { Binding(get: { editor.infoMessage != nil }, set: { if !$0 { editor.infoMessage = nil } }) }
+    private var exportPickerPresented: Binding<Bool> {
+        Binding(get: { exportFileURL != nil }, set: { if !$0 { exportFileURL = nil } })
+    }
+
     private func exportNow() {
         guard let document = editor.prepareExport() else { return }
-        // The document must be installed in state before presenting the system
-        // Files sheet. Deferring the presentation by one run-loop prevents
-        // iOS from discarding the exporter when a button also ends editing.
-        exportDocument = document
-        DispatchQueue.main.async { exporting = true }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hotpot_repacked-\(UUID().uuidString)")
+            .appendingPathExtension("bplist")
+        do {
+            try document.data.write(to: url, options: .atomic)
+            exportFileURL = url
+        } catch {
+            editor.errorMessage = "Không thể tạo file để xuất: \(error.localizedDescription)"
+        }
     }
     private func importLuckyCatalog(from url: URL) {
         do {
@@ -525,6 +543,44 @@ private struct KeyboardDoneModifier: ViewModifier {
                 Spacer()
                 Button("Xong") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
             }
+        }
+    }
+}
+
+/// Uses the native Files export controller directly.  Unlike SwiftUI's
+/// fileExporter, this controller remains reliable when the view is nested in
+/// the application's persistent tab and navigation containers.
+private struct SystemFileExportPicker: UIViewControllerRepresentable {
+    let fileURL: URL
+    let completion: (Bool) -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forExporting: [fileURL], asCopy: true)
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let completion: (Bool) -> Void
+        private var finished = false
+
+        init(completion: @escaping (Bool) -> Void) { self.completion = completion }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard !finished else { return }
+            finished = true
+            completion(!urls.isEmpty)
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            guard !finished else { return }
+            finished = true
+            completion(false)
         }
     }
 }
