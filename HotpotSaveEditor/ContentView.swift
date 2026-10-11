@@ -192,6 +192,16 @@ private struct LuckyCatView: View {
                         LuckyRewardCard(row: $row)
                     }
                 }
+
+                NavigationLink { ItemCatalogView() } label: {
+                    StudioRow(
+                        icon: "list.bullet.rectangle",
+                        title: "Danh sách Item",
+                        detail: "Tra cứu, thêm và quản lý ID vật phẩm"
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -270,11 +280,102 @@ private struct LuckyRewardCard: View {
                 LuckyRewardValueRow(title: "ID vật phẩm", detail: "Mã định danh vật phẩm", value: $row.identifier, numeric: true)
                     .onChange(of: row.identifier) { _, id in itemName.wrappedValue = editor.itemName(for: id) }
                 Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
-                LuckyRewardValueRow(title: "Tên vật phẩm", detail: "Tự điền từ danh mục; có thể sửa", value: itemName)
+                LuckyRewardValueRow(title: "Tên vật phẩm", detail: "Tự điền từ danh mục; có thể sửa khi được phép", value: itemName)
+                    .disabled(!editor.canEditItemName(for: row.identifier))
                 Divider().overlay(Color.primary.opacity(0.14)).padding(.leading, 16)
                 LuckyRewardValueRow(title: "Số lượng", detail: "Số vật phẩm nhận được", value: quantity, numeric: true)
             }
         }
+    }
+}
+
+private struct ItemCatalogView: View {
+    @EnvironmentObject var editor: SaveEditorModel
+    @State private var entries: [ItemCatalogEntry] = []
+    @State private var searchText = ""
+
+    private var visibleEntryIDs: [UUID] {
+        let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return entries
+            .filter { keyword.isEmpty || $0.itemID.localizedCaseInsensitiveContains(keyword) || $0.name.localizedCaseInsensitiveContains(keyword) }
+            .map(\.id)
+    }
+
+    private var nextCustomItemID: String {
+        let largest = entries.compactMap { Int($0.itemID) }.filter { $0 >= 3001 }.max() ?? 3000
+        return String(largest + 1)
+    }
+
+    var body: some View {
+        List {
+            Section {
+                Text("ID từ 0 đến 3000 là dữ liệu có sẵn. Chỉ tên đang trống mới có thể được thêm. ID từ 3001 là mục bạn tự thêm, có thể sửa hoặc xóa.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Item") {
+                ForEach(visibleEntryIDs, id: \.self) { entryID in
+                    if let index = entries.firstIndex(where: { $0.id == entryID }) {
+                        ItemCatalogEditorRow(entry: $entries[index]) {
+                            entries.removeAll { $0.id == entryID }
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .searchable(text: $searchText, prompt: "Tìm ID hoặc tên vật phẩm")
+        .navigationTitle("Danh sách Item")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    entries.append(.init(itemID: nextCustomItemID, name: "", isBuiltIn: false))
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Lưu") {
+                    if editor.saveItemCatalogEntries(entries) {
+                        entries = editor.itemCatalogEntries()
+                    }
+                }
+            }
+        }
+        .onAppear { entries = editor.itemCatalogEntries() }
+    }
+}
+
+private struct ItemCatalogEditorRow: View {
+    @Binding var entry: ItemCatalogEntry
+    let delete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                TextField("ID item", text: $entry.itemID)
+                    .keyboardType(.numbersAndPunctuation)
+                    .disabled(entry.isBuiltIn)
+                if !entry.isBuiltIn {
+                    Button(role: .destructive, action: delete) {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Xóa Item")
+                }
+            }
+
+            TextField("Tên vật phẩm", text: $entry.name)
+                .disabled(entry.isBuiltIn && !entry.allowsBuiltInNameEdit)
+
+            Text(entry.isBuiltIn
+                 ? (entry.allowsBuiltInNameEdit ? "Dữ liệu có sẵn chưa có tên: có thể thêm tên." : "Dữ liệu có sẵn: tên vật phẩm đã được khóa.")
+                 : "Item tự thêm: có thể sửa ID, tên hoặc xóa.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
     }
 }
 

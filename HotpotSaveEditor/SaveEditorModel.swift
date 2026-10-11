@@ -20,6 +20,21 @@ struct EditableRow: Identifiable, Hashable {
         self.storageKey = storageKey
     }
 }
+
+struct ItemCatalogEntry: Identifiable, Hashable {
+    let id = UUID()
+    let isBuiltIn: Bool
+    let allowsBuiltInNameEdit: Bool
+    var itemID: String
+    var name: String
+
+    init(itemID: String, name: String, isBuiltIn: Bool) {
+        self.itemID = itemID
+        self.name = name
+        self.isBuiltIn = isBuiltIn
+        allowsBuiltInNameEdit = isBuiltIn && name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
 enum ManualArea: String, CaseIterable, Identifiable {
     case facilities = "Cơ sở vật chất", foods = "Món ăn", customers = "Khách hàng", inventory = "Túi & vật phẩm"
     var id: String { rawValue }
@@ -155,7 +170,53 @@ final class SaveEditorModel: ObservableObject {
     func saveLuckyRewards(_ rows: [EditableRow]) { player["luckyCatRewardItems"] = .array(rows.map { .object(["type": number($0.subtitle), "itemId": number($0.identifier), "num": number($0.values.first)]) }); for row in rows { if row.values.count > 1, !row.values[1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { setItemName(row.values[1], for: row.identifier) } }; persist(); infoMessage = "Đã lưu phần thưởng Mèo Thần Tài." }
     func addLuckyReward() { var values = player["luckyCatRewardItems"]?.arrayValue ?? []; values.append(.object(["type": .number(0), "itemId": .number(0), "num": .number(0)])); player["luckyCatRewardItems"] = .array(values); persist() }
     func itemName(for id: String) -> String { itemCatalog[id] ?? "" }
-    func setItemName(_ name: String, for id: String) { guard !id.isEmpty else { return }; itemCatalog[id] = name.trimmingCharacters(in: .whitespacesAndNewlines); UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog") }
+    func canEditItemName(for id: String) -> Bool {
+        guard let value = Int(id) else { return false }
+        return value >= 3001 || (itemCatalog[id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    func setItemName(_ name: String, for id: String) {
+        guard !id.isEmpty, canEditItemName(for: id) else { return }
+        itemCatalog[id] = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog")
+    }
+    func itemCatalogEntries() -> [ItemCatalogEntry] {
+        itemCatalog
+            .map { ItemCatalogEntry(itemID: $0.key, name: $0.value, isBuiltIn: (Int($0.key) ?? 3001) <= 3000) }
+            .sorted { lhs, rhs in
+                let left = Int(lhs.itemID) ?? .max
+                let right = Int(rhs.itemID) ?? .max
+                return left == right ? lhs.itemID.localizedStandardCompare(rhs.itemID) == .orderedAscending : left < right
+            }
+    }
+    func saveItemCatalogEntries(_ entries: [ItemCatalogEntry]) -> Bool {
+        var result = itemCatalog.filter { (Int($0.key) ?? 3001) <= 3000 }
+        var usedCustomIDs = Set<String>()
+
+        for entry in entries where entry.isBuiltIn {
+            guard let number = Int(entry.itemID), number <= 3000 else { continue }
+            let currentName = result[entry.itemID] ?? ""
+            if entry.allowsBuiltInNameEdit && currentName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                result[entry.itemID] = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        for entry in entries where !entry.isBuiltIn {
+            let id = entry.itemID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let number = Int(id), number >= 3001 else {
+                errorMessage = "ID item tự thêm phải là số từ 3001 trở lên."
+                return false
+            }
+            guard usedCustomIDs.insert(id).inserted else {
+                errorMessage = "ID item \(id) bị trùng trong danh sách."
+                return false
+            }
+            result[id] = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        itemCatalog = result
+        UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog")
+        infoMessage = "Đã lưu Danh sách Item."
+        return true
+    }
     func importItemCatalog(_ catalog: [String: String]) { itemCatalog.merge(catalog) { _, imported in imported }; UserDefaults.standard.set(itemCatalog, forKey: "luckyItemCatalog"); infoMessage = "Đã nhập \(catalog.count) tên vật phẩm." }
     func resetToOriginal() { guard isLoaded else { return }; player = originalPlayer; persist(); infoMessage = "Đã đưa dữ liệu về trạng thái vừa giải mã." }
     func luckyRecords() -> [EditableRow] { (player["luckyCatRecords"]?.arrayValue ?? []).map { let o = $0.objectValue ?? [:]; return .init(identifier: string(o["talkId"]), subtitle: "Vật phẩm \(string(o["itemId"]))", values: [string(o["reward"])]) } }
@@ -180,7 +241,7 @@ final class SaveEditorModel: ObservableObject {
     private func loadItemCatalog() {
         var catalog: [String: String] = [:]
         if let url = Bundle.main.url(forResource: "ItemCatalog", withExtension: "json"), let data = try? Data(contentsOf: url), let bundled = try? JSONDecoder().decode([String: String].self, from: data) { catalog = bundled }
-        if let saved = UserDefaults.standard.dictionary(forKey: "luckyItemCatalog") as? [String: String] { catalog.merge(saved) { _, current in current } }
+        if let saved = UserDefaults.standard.dictionary(forKey: "luckyItemCatalog") as? [String: String] { catalog.merge(saved) { _, savedValue in savedValue } }
         itemCatalog = catalog
     }
     private func persist() { do { try writeWorkspace() } catch { errorMessage = error.localizedDescription } }
